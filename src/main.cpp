@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <fuse.h>
+#include "Git.h"
 #include "3rd-party/json.hpp"
 
 using Json = nlohmann::json;
@@ -34,6 +35,8 @@ int main(int argc, char **argv)
         std::ifstream configFile(argv[1]);
         configFile >> config;
     } // Here the file closes
+
+    Git git(config["git_path"].get<std::string>());
 
     std::vector<std::string> fuseArgs = config["fuse_args"];
     fuseArgs.insert(fuseArgs.begin(), ""); // argv[0] is command name

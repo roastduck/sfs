@@ -11,7 +11,7 @@ endif(NOT CMAKE_BUILD_TYPE)
 
 file(GLOB_RECURSE SRCS ${CMAKE_BINARY_DIR}/src/*.cpp)
 add_executable(sfs ${SRCS})
-target_link_libraries(sfs -lfuse)
+target_link_libraries(sfs -lfuse -lgit2)
 set_target_properties(
     sfs
     PROPERTIES

@@ -3,6 +3,7 @@
 # Dependencies
 
 - FUSE >= 2.6 (Use `apt-get install libfuse-dev` on Ubuntu 16.04 will get you a FUSE 2.6)
+- libgit2 (Use `apt-get install libgit2-dev` on Ubuntu)
 - CMake >= 2.8.12
 
 # Build

@@ -1,3 +1,4 @@
 {
+    "git_path": "/path/to/.git",
     "fuse_args": ["-d", "/path/to/your/mounting/point"]
 }
