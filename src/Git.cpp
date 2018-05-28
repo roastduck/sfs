@@ -22,6 +22,7 @@ Git::Git(const std::string &path)
 {
     if (++refCount == 1)
         checkError(git_libgit2_init());
+    stat(path.c_str(), &rootStat);
     checkError(git_repository_open_bare(&repo, path.c_str()));
 }
 
@@ -31,7 +32,7 @@ Git::~Git()
         checkError(git_libgit2_shutdown());
 }
 
-Git::FileAttr Git::getAttr(const git_tree_entry *entry)
+Git::FileAttr Git::getAttr(const git_tree_entry *entry) const
 {
     FileAttr attr;
 
@@ -42,23 +43,32 @@ Git::FileAttr Git::getAttr(const git_tree_entry *entry)
 
     attr.name = git_tree_entry_name(entry);
     attr.stat.st_mode = mode | (isDir ? S_IFDIR : S_IFREG);
+    attr.stat.st_uid = rootStat.st_uid;
+    attr.stat.st_gid = rootStat.st_gid;
     return attr;
 }
 
-int Git::treeWalkCallback(const char *root, const git_tree_entry *entry, void *payload)
+struct WalkPayload
+{
+    std::vector<Git::FileAttr> list;
+    const Git *git;
+};
+
+int Git::treeWalkCallback(const char *root, const git_tree_entry *entry, void *_payload)
 {
     UNUSED(root);
+    WalkPayload *payload = (WalkPayload*)_payload;
 
     const int CONTINUE = 0, SKIP = 1, ABORT = -1;
     UNUSED(ABORT);
 
-    auto attr = getAttr(entry);
-    ((std::vector<FileAttr>*)payload)->push_back(attr);
+    auto attr = payload->git->getAttr(entry);
+    payload->list.push_back(attr);
 
     return ((attr.stat.st_mode & S_IFMT) == S_IFDIR) ? SKIP : CONTINUE;
 }
 
-std::vector<Git::FileAttr> Git::listDir(const std::string &path)
+std::vector<Git::FileAttr> Git::listDir(const std::string &path) const
 {
     git_object *obj = NULL;
     checkError(git_revparse_single(&obj, repo, "HEAD^{tree}"));
@@ -75,12 +85,12 @@ std::vector<Git::FileAttr> Git::listDir(const std::string &path)
         git_tree_entry_free(entry); // No error returned
     }
 
-    std::vector<FileAttr> ret;
-    checkError(git_tree_walk(tree, GIT_TREEWALK_PRE, treeWalkCallback, &ret));
-    return ret;
+    WalkPayload payload;
+    checkError(git_tree_walk(tree, GIT_TREEWALK_PRE, treeWalkCallback, &payload));
+    return payload.list;
 }
 
-Git::FileAttr Git::getAttr(const std::string &path)
+Git::FileAttr Git::getAttr(const std::string &path) const
 {
     git_object *obj = NULL;
     checkError(git_revparse_single(&obj, repo, "HEAD^{tree}"));
@@ -92,7 +102,7 @@ Git::FileAttr Git::getAttr(const std::string &path)
     if (path == "/")
     {
         // '/' is not an entry
-        attr.stat.st_mode = 0777 | S_IFDIR;
+        attr.stat = rootStat;
     } else {
         git_tree_entry *entry = NULL;
         checkError(git_tree_entry_bypath(&entry, root, path.c_str() + 1));

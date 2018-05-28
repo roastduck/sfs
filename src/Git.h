@@ -33,6 +33,10 @@ public:
     };
 
 private:
+    FileAttr getAttr(const git_tree_entry *entry) const;
+
+    struct stat rootStat; /// Attributes of .git
+
     static int refCount; /// Reference count of Git objects
 
     /** Check libgit2 error code
@@ -42,9 +46,7 @@ private:
 
     /** Callback of git_tree_walk
      */
-    static int treeWalkCallback(const char *root, const git_tree_entry *entry, void *payload);
-
-    static FileAttr getAttr(const git_tree_entry *entry);
+    static int treeWalkCallback(const char *root, const git_tree_entry *entry, void *_payload);
 
 public:
     git_repository *repo;
@@ -56,8 +58,8 @@ public:
 
     ~Git();
 
-    std::vector<FileAttr> listDir(const std::string &path);
-    FileAttr getAttr(const std::string &path);
+    std::vector<FileAttr> listDir(const std::string &path) const;
+    FileAttr getAttr(const std::string &path) const;
 };
 
 #endif // GIT_H_
