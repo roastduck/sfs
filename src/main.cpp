@@ -9,18 +9,27 @@
 
 using Json = nlohmann::json;
 
+Git *git;
+
 static int sfs_readdir(
     const char *path, void *buf, fuse_fill_dir_t filler,
     off_t offset, struct fuse_file_info *fi
 )
 {
+    auto list = git->listDir(path);
+    for (const auto &item : list)
+        filler(buf, item.name.c_str(), &item.stat, 0 /* Offset disabled */);
     return 0;
 }
 
 static int sfs_getattr(const char *path, struct stat* st)
 {
+    *st = git->getAttr(path).stat;
     return 0;
 }
+
+static struct fuse_operations sfs_ops;
+// CAUTIOUS: If you put `sfs_ops` in the stack, all the things will go wrong!
 
 int main(int argc, char **argv)
 {
@@ -36,7 +45,7 @@ int main(int argc, char **argv)
         configFile >> config;
     } // Here the file closes
 
-    Git git(config["git_path"].get<std::string>());
+    git = new Git(config["git_path"].get<std::string>()); // Will not be deleted
 
     std::vector<std::string> fuseArgs = config["fuse_args"];
     fuseArgs.insert(fuseArgs.begin(), ""); // argv[0] is command name
@@ -45,7 +54,6 @@ int main(int argc, char **argv)
     for (int i = 0; i < fuseArgc; i++)
         fuseArgv[i] = const_cast<char*>(fuseArgs[i].c_str()); // I bet FUSE won't change it
 
-    struct fuse_operations sfs_ops;
     // Named struct initializaion is only supported in plain C
     // So we are using assignments here
     sfs_ops.readdir = sfs_readdir;
