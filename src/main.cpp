@@ -16,16 +16,30 @@ static int sfs_readdir(
     off_t offset, struct fuse_file_info *fi
 )
 {
-    auto list = git->listDir(path);
-    for (const auto &item : list)
-        filler(buf, item.name.c_str(), &item.stat, 0 /* Offset disabled */);
-    return 0;
+    try
+    {
+        auto list = git->listDir(path);
+        for (const auto &item : list)
+            filler(buf, item.name.c_str(), &item.stat, 0 /* Offset disabled */);
+        return 0;
+    }
+    catch (Git::Error e)
+    {
+        return e.unixError();
+    }
 }
 
-static int sfs_getattr(const char *path, struct stat* st)
+static int sfs_getattr(const char *path, struct stat *st)
 {
-    *st = git->getAttr(path).stat;
-    return 0;
+    try
+    {
+        *st = git->getAttr(path).stat;
+        return 0;
+    }
+    catch (Git::Error e)
+    {
+        return e.unixError();
+    }
 }
 
 static struct fuse_operations sfs_ops;

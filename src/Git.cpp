@@ -11,6 +11,7 @@ int Git::checkError(int error)
     {
         const git_error *e = giterr_last();
         throw Error(
+            error,
             "Error " + std::to_string(error) + "/" + std::to_string(e->klass) +
             ": " + e->message
         );
@@ -27,6 +28,7 @@ Git::Git(const std::string &path)
 
 Git::~Git()
 {
+    git_repository_free(repo);
     if (--refCount == 0)
         checkError(git_libgit2_shutdown());
 }
@@ -72,11 +74,17 @@ std::vector<Git::FileAttr> Git::listDir(const std::string &path)
         checkError(git_tree_entry_bypath(&entry, root, path.c_str() + 1));
         assert(git_tree_entry_type(entry) == GIT_OBJ_TREE);
         checkError(git_tree_lookup(&tree, repo, git_tree_entry_id(entry)));
+        // FIXME(twd2): entry would not be free if an exception is thrown.
         git_tree_entry_free(entry); // No error returned
     }
 
     std::vector<FileAttr> ret;
     checkError(git_tree_walk(tree, GIT_TREEWALK_PRE, treeWalkCallback, &ret));
+    if (tree != root)
+    {
+        git_tree_free(tree);
+    }
+    git_object_free(obj);
     return ret;
 }
 
@@ -97,9 +105,10 @@ Git::FileAttr Git::getAttr(const std::string &path)
         git_tree_entry *entry = NULL;
         checkError(git_tree_entry_bypath(&entry, root, path.c_str() + 1));
         attr = getAttr(entry);
+        // FIXME(twd2): ditto
         git_tree_entry_free(entry); // No error returned
     }
-
+    git_object_free(obj);
     return attr;
 }
 

@@ -18,9 +18,23 @@ public:
      */
     class Error : public std::runtime_error
     {
+    private:
+        int _error;
     public:
-        Error(const std::string &what) :
-            std::runtime_error("[ERROR] libgit2: " + what) {}
+        Error(int error, const std::string &what) :
+            _error(error), std::runtime_error("[ERROR] libgit2: " + what) {}
+
+        int error() const
+        {
+            return _error;
+        }
+
+        int unixError() const
+        {
+            if (_error == GIT_ENOTFOUND) return -ENOENT;
+            if (_error == GIT_EEXISTS) return -EEXIST;
+            return -EPERM; // TODO
+        }
     };
 
     /** Attributes of a file
