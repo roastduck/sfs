@@ -1,3 +1,15 @@
 # Vim temporary files
 *~
 *.swp
+
+# Local config file
+/config.json
+
+# CMake files
+/CMakeCache.txt
+/CMakeFiles
+/Makefile
+*.cmake
+
+# Binary
+/bin
