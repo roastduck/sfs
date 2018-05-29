@@ -76,6 +76,8 @@ public:
     std::shared_ptr<git_tree> root(const char *spec = "HEAD^{tree}") const;
     std::shared_ptr<git_tree_entry> getEntry(const std::string &path) const;
 
+    void dump(const std::string &path, const std::string &out_path) const;
+
     std::vector<FileAttr> listDir(const std::string &path) const;
     FileAttr getAttr(const std::string &path) const;
 };

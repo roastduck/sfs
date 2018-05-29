@@ -1,4 +1,6 @@
 #include <cassert>
+#include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include "Git.h"
 #include "utils.h"
@@ -49,6 +51,23 @@ std::shared_ptr<git_tree_entry> Git::getEntry(const std::string &path) const
     git_tree_entry *e = nullptr;
     checkError(git_tree_entry_bypath(&e, root.get(), path.c_str() + 1));
     return std::shared_ptr<git_tree_entry>(e, [](git_tree_entry *p) { git_tree_entry_free(p); });
+}
+
+void Git::dump(const std::string &path, const std::string &out_path) const
+{
+    // TODO(twd2): cache
+    auto e = getEntry(path);
+    const git_otype type = git_tree_entry_type(e.get());
+    assert(type == GIT_OBJ_BLOB);
+    git_object *obj_ = nullptr;
+    checkError(git_tree_entry_to_object(&obj_, repo, e.get()));
+    std::shared_ptr<git_blob> blob((git_blob *)obj_, [](git_blob *p) { git_blob_free(p); });
+    std::size_t size = git_blob_rawsize(blob.get());
+    const void *data = git_blob_rawcontent(blob.get());
+
+    std::ofstream fout(out_path.c_str());
+    fout.write((const char *)data, size);
+    fout.close();
 }
 
 Git::FileAttr Git::getAttr(const git_tree_entry *entry) const
