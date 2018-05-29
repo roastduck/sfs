@@ -57,7 +57,7 @@ private:
     /** Check libgit2 error code
      *  !!!!! PLEASE WRAP ANY CALL TO libgit2 WITH THIS FUNCTION !!!!!
      */
-    static int checkError(int error);
+    static int checkError(int error, const char *fn);
 
     /** Callback of git_tree_walk
      */
@@ -74,9 +74,12 @@ public:
     ~Git();
 
     std::shared_ptr<git_tree> root(const char *spec = "HEAD^{tree}") const;
+    std::shared_ptr<git_commit> head(const char *spec = "HEAD") const;
     std::shared_ptr<git_tree_entry> getEntry(const std::string &path) const;
 
     void dump(const std::string &path, const std::string &out_path) const;
+    void commit(const std::string &in_path, const std::string &path, const char *msg = "commit");
+    void truncate(const std::string &path, std::size_t size);
 
     std::vector<FileAttr> listDir(const std::string &path) const;
     FileAttr getAttr(const std::string &path) const;

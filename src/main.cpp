@@ -10,7 +10,9 @@
 
 using Json = nlohmann::json;
 
+Json config;
 Git *git;
+bool commit_on_write = false;
 
 static int sfs_readdir(
     const char *path, void *buf, fuse_fill_dir_t filler,
@@ -45,10 +47,13 @@ static int sfs_getattr(const char *path, struct stat *st)
 
 struct OpenContext
 {
+    std::string path;
     std::string tmpfile;
     int fd = -1;
+    bool dirty = false;
 
-    explicit OpenContext(const std::string &tmpfile) : tmpfile(tmpfile) { }
+    explicit OpenContext(const std::string &path, const std::string &tmpfile) :
+        path(path), tmpfile(tmpfile) { }
 
     ~OpenContext()
     {
@@ -61,6 +66,19 @@ struct OpenContext
         {
             printf("unlink %s\n", tmpfile.c_str());
             unlink(tmpfile.c_str());
+        }
+    }
+
+    void commit(Git &git, const char *msg)
+    {
+        if (dirty)
+        {
+            git.commit(tmpfile, path, msg);
+            dirty = false;
+        }
+        else
+        {
+            printf("not dirty\n");
         }
     }
 };
@@ -77,7 +95,7 @@ static int sfs_open(const char *path, struct fuse_file_info *fi)
         }
         git->dump(path, tmp);
         printf("dumped %s\n", tmp);
-        OpenContext *ctx = new OpenContext(tmp);
+        OpenContext *ctx = new OpenContext(path, tmp);
         fi->fh = (uint64_t)(void *)ctx;
         ctx->fd = open(tmp, O_RDWR);
         if (ctx->fd < 0)
@@ -98,7 +116,7 @@ static int sfs_open(const char *path, struct fuse_file_info *fi)
 static int sfs_release(const char *path, struct fuse_file_info *fi)
 {
     OpenContext *ctx = (OpenContext *)(void *)fi->fh;
-    // TODO(twd2): commit
+    ctx->commit(*git, "close");
     delete ctx;
     return 0;
 }
@@ -111,13 +129,20 @@ static int sfs_read(const char *path, char *buf, size_t size, off_t offset, stru
     return read(ctx->fd, buf, size);
 }
 
-static int sfs_write(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+static int sfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     OpenContext *ctx = (OpenContext *)(void *)fi->fh;
     int ret;
     if ((ret = lseek(ctx->fd, offset, SEEK_SET)) < 0) return ret;
     if ((ret = write(ctx->fd, buf, size)) < 0) return ret;
-    // TODO(twd2): commit
+    ctx->dirty = true;
+    if (commit_on_write) ctx->commit(*git, "write");
+    return ret;
+}
+
+static int sfs_truncate(const char *path, off_t length)
+{
+    git->truncate(path, length);
     return 0;
 }
 
@@ -132,16 +157,17 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    Json config;
     {
         std::ifstream configFile(argv[1]);
         configFile >> config;
     } // Here the file closes
 
+    commit_on_write = config["commit_on_write"].get<bool>();
+
     git = new Git(config["git_path"].get<std::string>()); // Will not be deleted
 
     std::vector<std::string> fuseArgs = config["fuse_args"];
-    fuseArgs.insert(fuseArgs.begin(), ""); // argv[0] is command name
+    fuseArgs.insert(fuseArgs.begin(), argv[0]);
     const int fuseArgc = fuseArgs.size();
     char *fuseArgv[fuseArgc];
     for (int i = 0; i < fuseArgc; i++)
@@ -155,6 +181,7 @@ int main(int argc, char **argv)
     sfs_ops.release = sfs_release;
     sfs_ops.read = sfs_read;
     sfs_ops.write = sfs_write;
+    sfs_ops.truncate = sfs_truncate;
 
     return fuse_main(fuseArgc, fuseArgv, &sfs_ops, NULL);
 }
