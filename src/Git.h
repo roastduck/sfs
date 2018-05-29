@@ -8,6 +8,7 @@
 #include <git2.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <memory>
 
 /** Controller of a git repository
  */
@@ -71,6 +72,9 @@ public:
     Git(const std::string &path);
 
     ~Git();
+
+    std::shared_ptr<git_tree> root(const char *spec = "HEAD^{tree}") const;
+    std::shared_ptr<git_tree_entry> getEntry(const std::string &path) const;
 
     std::vector<FileAttr> listDir(const std::string &path) const;
     FileAttr getAttr(const std::string &path) const;

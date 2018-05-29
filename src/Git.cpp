@@ -34,6 +34,23 @@ Git::~Git()
         checkError(git_libgit2_shutdown());
 }
 
+std::shared_ptr<git_tree> Git::root(const char *spec) const
+{
+    git_object *obj = nullptr;
+    checkError(git_revparse_single(&obj, repo, spec));
+    git_tree *root = (git_tree*)obj;
+    return std::shared_ptr<git_tree>(root, [](git_tree *p) { git_tree_free(p); });
+}
+
+std::shared_ptr<git_tree_entry> Git::getEntry(const std::string &path) const
+{
+    assert(path.length() > 0 && path[0] == '/');
+    std::shared_ptr<git_tree> root = this->root();
+    git_tree_entry *e = nullptr;
+    checkError(git_tree_entry_bypath(&e, root.get(), path.c_str() + 1));
+    return std::shared_ptr<git_tree_entry>(e, [](git_tree_entry *p) { git_tree_entry_free(p); });
+}
+
 Git::FileAttr Git::getAttr(const git_tree_entry *entry) const
 {
     FileAttr attr;
@@ -44,7 +61,7 @@ Git::FileAttr Git::getAttr(const git_tree_entry *entry) const
     git_filemode_t mode = git_tree_entry_filemode(entry);
 
     attr.name = git_tree_entry_name(entry);
-    attr.stat.st_mode = mode | (isDir ? S_IFDIR : S_IFREG);
+    attr.stat.st_mode = mode | (isDir ? (S_IFDIR | 0755) : S_IFREG);
     attr.stat.st_uid = rootStat.st_uid;
     attr.stat.st_gid = rootStat.st_gid;
     attr.stat.st_nlink = 1;
@@ -87,39 +104,27 @@ int Git::treeWalkCallback(const char *root, const git_tree_entry *entry, void *_
 
 std::vector<Git::FileAttr> Git::listDir(const std::string &path) const
 {
-    git_object *obj = NULL;
-    checkError(git_revparse_single(&obj, repo, "HEAD^{tree}"));
-    git_tree *root = (git_tree*)obj, *tree = NULL;
+    std::shared_ptr<git_tree> root = this->root(), tree;
 
     assert(path.length() > 0 && path[0] == '/');
     if (path == "/")
         tree = root;
     else {
-        git_tree_entry *entry = NULL;
-        checkError(git_tree_entry_bypath(&entry, root, path.c_str() + 1));
-        assert(git_tree_entry_type(entry) == GIT_OBJ_TREE);
-        checkError(git_tree_lookup(&tree, repo, git_tree_entry_id(entry)));
-        // FIXME(twd2): entry would not be free if an exception is thrown.
-        git_tree_entry_free(entry); // No error returned
+        git_tree *tree_ = NULL;
+        auto e = getEntry(path);
+        assert(git_tree_entry_type(e.get()) == GIT_OBJ_TREE);
+        checkError(git_tree_lookup(&tree_, repo, git_tree_entry_id(e.get())));
+        tree = std::shared_ptr<git_tree>(tree_, [](git_tree *p) { git_tree_free(p); }); // TODO(twd2): refactor
     }
 
     WalkPayload payload;
     payload.git = this;
-    checkError(git_tree_walk(tree, GIT_TREEWALK_PRE, treeWalkCallback, &payload));
-    if (tree != root)
-    {
-        git_tree_free(tree);
-    }
-    git_object_free(obj);
+    checkError(git_tree_walk(tree.get(), GIT_TREEWALK_PRE, treeWalkCallback, &payload));
     return payload.list;
 }
 
 Git::FileAttr Git::getAttr(const std::string &path) const
 {
-    git_object *obj = NULL;
-    checkError(git_revparse_single(&obj, repo, "HEAD^{tree}"));
-    git_tree *root = (git_tree*)obj;
-
     FileAttr attr;
 
     assert(path.length() > 0 && path[0] == '/');
@@ -128,13 +133,9 @@ Git::FileAttr Git::getAttr(const std::string &path) const
         // '/' is not an entry
         attr.stat = rootStat;
     } else {
-        git_tree_entry *entry = NULL;
-        checkError(git_tree_entry_bypath(&entry, root, path.c_str() + 1));
-        attr = getAttr(entry);
-        // FIXME(twd2): ditto
-        git_tree_entry_free(entry); // No error returned
+        auto e = getEntry(path);
+        attr = getAttr(e.get());
     }
-    git_object_free(obj);
     return attr;
 }
 
