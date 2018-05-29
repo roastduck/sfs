@@ -47,6 +47,7 @@ Git::FileAttr Git::getAttr(const git_tree_entry *entry) const
     attr.stat.st_mode = mode | (isDir ? S_IFDIR : S_IFREG);
     attr.stat.st_uid = rootStat.st_uid;
     attr.stat.st_gid = rootStat.st_gid;
+    attr.stat.st_nlink = 1;
 
     if (type == GIT_OBJ_BLOB)
     {
