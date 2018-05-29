@@ -87,7 +87,7 @@ static int sfs_open(const char *path, struct fuse_file_info *fi)
 {
     try
     {
-        char tmp[256] = "sfstemp.XXXXXX";
+        char tmp[] = "sfstemp.XXXXXX";
         if (!mktemp(tmp)) // FIXME(twd2): Never use this function.
         {
             perror("mktemp");

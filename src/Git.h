@@ -21,9 +21,10 @@ public:
     {
     private:
         int _error;
+
     public:
         Error(int error, const std::string &what) :
-            _error(error), std::runtime_error("[ERROR] libgit2: " + what) {}
+            std::runtime_error("[ERROR] libgit2: " + what), _error(error) {}
 
         int error() const
         {
