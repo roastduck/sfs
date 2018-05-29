@@ -8,7 +8,7 @@
 
 int Git::refCount = 0;
 
-int Git::checkError(int error, const char *fn)
+int Git::checkErrorImpl(int error, const char *fn)
 {
     if (error < 0)
     {
@@ -25,22 +25,22 @@ int Git::checkError(int error, const char *fn)
 Git::Git(const std::string &path)
 {
     if (++refCount == 1)
-        checkError(git_libgit2_init(), "git_libgit2_init");
+        CHECK_ERROR(git_libgit2_init());
     stat(path.c_str(), &rootStat);
-    checkError(git_repository_open_bare(&repo, path.c_str()), "git_repository_open_bare");
+    CHECK_ERROR(git_repository_open_bare(&repo, path.c_str()));
 }
 
 Git::~Git()
 {
     git_repository_free(repo);
     if (--refCount == 0)
-        checkError(git_libgit2_shutdown(), "git_libgit2_shutdown");
+        CHECK_ERROR(git_libgit2_shutdown());
 }
 
 std::shared_ptr<git_tree> Git::root(const char *spec) const
 {
     git_object *obj = nullptr;
-    checkError(git_revparse_single(&obj, repo, spec), "git_revparse_single");
+    CHECK_ERROR(git_revparse_single(&obj, repo, spec));
     git_tree *root = (git_tree*)obj;
     return std::shared_ptr<git_tree>(root, [](git_tree *p) { git_tree_free(p); });
 }
@@ -48,7 +48,7 @@ std::shared_ptr<git_tree> Git::root(const char *spec) const
 std::shared_ptr<git_commit> Git::head(const char *spec) const
 {
     git_object *obj = nullptr;
-    checkError(git_revparse_single(&obj, repo, spec), "git_revparse_single");
+    CHECK_ERROR(git_revparse_single(&obj, repo, spec));
     git_commit *root = (git_commit*)obj;
     return std::shared_ptr<git_commit>(root, [](git_commit *p) { git_commit_free(p); });
 }
@@ -58,7 +58,7 @@ std::shared_ptr<git_tree_entry> Git::getEntry(const std::string &path) const
     assert(path.length() > 0 && path[0] == '/');
     std::shared_ptr<git_tree> root = this->root();
     git_tree_entry *e = nullptr;
-    checkError(git_tree_entry_bypath(&e, root.get(), path.c_str() + 1), "git_tree_entry_bypath");
+    CHECK_ERROR(git_tree_entry_bypath(&e, root.get(), path.c_str() + 1));
     return std::shared_ptr<git_tree_entry>(e, [](git_tree_entry *p) { git_tree_entry_free(p); });
 }
 
@@ -69,7 +69,7 @@ void Git::dump(const std::string &path, const std::string &out_path) const
     const git_otype type = git_tree_entry_type(e.get());
     assert(type == GIT_OBJ_BLOB);
     git_object *obj_ = nullptr;
-    checkError(git_tree_entry_to_object(&obj_, repo, e.get()), "git_tree_entry_to_object");
+    CHECK_ERROR(git_tree_entry_to_object(&obj_, repo, e.get()));
     std::shared_ptr<git_blob> blob((git_blob *)obj_, [](git_blob *p) { git_blob_free(p); });
     std::size_t size = git_blob_rawsize(blob.get());
     const void *data = git_blob_rawcontent(blob.get());
@@ -85,11 +85,11 @@ void Git::commit(const std::string &in_path, const std::string &path, const char
     assert(path.length() > 0 && path[0] == '/');
 
     git_signature *sig;
-    checkError(git_signature_default(&sig, repo), "git_signature_default");
+    CHECK_ERROR(git_signature_default(&sig, repo));
 
     git_oid blob_id, tree_id, commit_id;
 
-    checkError(git_blob_create_fromdisk(&blob_id, repo, in_path.c_str()), "git_blob_create_fromdisk");
+    CHECK_ERROR(git_blob_create_fromdisk(&blob_id, repo, in_path.c_str()));
     char idstr[256];
     memset(idstr, 0, sizeof(idstr));
     git_oid_fmt(idstr, &blob_id);
@@ -103,9 +103,9 @@ void Git::commit(const std::string &in_path, const std::string &path, const char
     // TODO(twd2): more information
 
     git_index *index;
-    checkError(git_repository_index(&index, repo), "git_repository_index");
-    checkError(git_index_add(index, &e), "git_index_add");
-    checkError(git_index_write_tree(&tree_id, index), "git_index_write_tree");
+    CHECK_ERROR(git_repository_index(&index, repo));
+    CHECK_ERROR(git_index_add(index, &e));
+    CHECK_ERROR(git_index_write_tree(&tree_id, index));
     git_index_free(index);
 
     memset(idstr, 0, sizeof(idstr));
@@ -113,12 +113,13 @@ void Git::commit(const std::string &in_path, const std::string &path, const char
     printf("tree id %s\n", idstr);
 
     git_tree *tree;
-    checkError(git_tree_lookup(&tree, repo, &tree_id), "git_tree_lookup");
+    CHECK_ERROR(git_tree_lookup(&tree, repo, &tree_id));
 
     auto head = this->head();
-    checkError(git_commit_create_v(
+    CHECK_ERROR(git_commit_create_v(
       &commit_id, repo, "HEAD", sig, sig,
-      nullptr, (std::string(msg) + " " + path).c_str(), tree, 1, head.get()), "git_commit_create_v");
+      nullptr, (std::string(msg) + " " + path).c_str(), tree, 1, head.get()
+    ));
 
     git_tree_free(tree);
     git_signature_free(sig);
@@ -162,7 +163,7 @@ Git::FileAttr Git::getAttr(const git_tree_entry *entry) const
     if (type == GIT_OBJ_BLOB)
     {
         git_object *obj = NULL;
-        checkError(git_tree_entry_to_object(&obj, repo, entry), "git_tree_entry_to_object");
+        CHECK_ERROR(git_tree_entry_to_object(&obj, repo, entry));
         git_blob *blob = (git_blob *)obj;
         attr.stat.st_size = git_blob_rawsize(blob);
         git_object_free(obj);
@@ -206,13 +207,13 @@ std::vector<Git::FileAttr> Git::listDir(const std::string &path) const
         git_tree *tree_ = NULL;
         auto e = getEntry(path);
         assert(git_tree_entry_type(e.get()) == GIT_OBJ_TREE);
-        checkError(git_tree_lookup(&tree_, repo, git_tree_entry_id(e.get())), "git_tree_lookup");
+        CHECK_ERROR(git_tree_lookup(&tree_, repo, git_tree_entry_id(e.get())));
         tree = std::shared_ptr<git_tree>(tree_, [](git_tree *p) { git_tree_free(p); }); // TODO(twd2): refactor
     }
 
     WalkPayload payload;
     payload.git = this;
-    checkError(git_tree_walk(tree.get(), GIT_TREEWALK_PRE, treeWalkCallback, &payload), "git_tree_walk");
+    CHECK_ERROR(git_tree_walk(tree.get(), GIT_TREEWALK_PRE, treeWalkCallback, &payload));
     return payload.list;
 }
 

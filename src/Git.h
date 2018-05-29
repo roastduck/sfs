@@ -10,6 +10,11 @@
 #include <sys/types.h>
 #include <memory>
 
+/** Check libgit2 error code
+ *  !!!!! PLEASE WRAP ANY CALL TO libgit2 WITH THIS MACRO !!!!!
+ */
+#define CHECK_ERROR(fn) Git::checkErrorImpl((fn), #fn)
+
 /** Controller of a git repository
  */
 class Git
@@ -55,10 +60,7 @@ private:
 
     static int refCount; /// Reference count of Git objects
 
-    /** Check libgit2 error code
-     *  !!!!! PLEASE WRAP ANY CALL TO libgit2 WITH THIS FUNCTION !!!!!
-     */
-    static int checkError(int error, const char *fn);
+    static int checkErrorImpl(int error, const char *fn);
 
     /** Callback of git_tree_walk
      */
