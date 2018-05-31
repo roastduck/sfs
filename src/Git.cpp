@@ -105,6 +105,7 @@ void Git::commit(const std::string &in_path, const std::string &path, const char
     git_index *index;
     CHECK_ERROR(git_repository_index(&index, repo));
     CHECK_ERROR(git_index_add(index, &e));
+    CHECK_ERROR(git_index_write(index));
     CHECK_ERROR(git_index_write_tree(&tree_id, index));
     git_index_free(index);
 
@@ -128,10 +129,10 @@ void Git::commit(const std::string &in_path, const std::string &path, const char
     git_oid_fmt(idstr, &commit_id);
     printf("commit id %s\n", idstr);
 }
+
 // same as the commit(const std::string &in_path, const std::string &path, const char *msg)
 void Git::commit(const git_oid &blob_id, const std::string &path, const char *msg)
 {
-    
     assert(path.length() > 0 && path[0] == '/');
 
     git_signature *sig;
@@ -148,6 +149,7 @@ void Git::commit(const git_oid &blob_id, const std::string &path, const char *ms
     git_index *index;
     CHECK_ERROR(git_repository_index(&index, repo));
     CHECK_ERROR(git_index_add(index, &e));
+    CHECK_ERROR(git_index_write(index));
     CHECK_ERROR(git_index_write_tree(&tree_id, index));
     git_index_free(index);
 
@@ -177,12 +179,9 @@ void Git::commit_remove(const std::string &path, const char *msg)
 
     git_index *index;
     CHECK_ERROR(git_repository_index(&index, repo));
-    CHECK_ERROR(git_index_remove_bypath(index, path.c_str()+1)); 
-  //  char *paths[] = {(char *)path.c_str()+1};
-  //  git_strarray arr = {paths, 1}; 
-  //  CHECK_ERROR(git_index_remove_all(index, &arr,nullptr,nullptr));    
-    CHECK_ERROR(git_index_write_tree(&tree_id, index));;   
-
+    CHECK_ERROR(git_index_remove_bypath(index, path.c_str() + 1));
+    CHECK_ERROR(git_index_write(index));
+    CHECK_ERROR(git_index_write_tree(&tree_id, index));
     git_index_free(index);
 
     git_tree *tree;
