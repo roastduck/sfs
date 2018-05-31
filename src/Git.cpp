@@ -128,11 +128,46 @@ void Git::commit(const std::string &in_path, const std::string &path, const char
     git_oid_fmt(idstr, &commit_id);
     printf("commit id %s\n", idstr);
 }
+// same as the commit(const std::string &in_path, const std::string &path, const char *msg)
+void Git::commit(const git_oid &blob_id, const std::string &path, const char *msg)
+{
+    
+    assert(path.length() > 0 && path[0] == '/');
 
+    git_signature *sig;
+    CHECK_ERROR(git_signature_default(&sig, repo));
+
+    git_oid tree_id, commit_id;
+    
+    git_index_entry e;
+    memset(&e, 0, sizeof(e));
+    e.id = blob_id;
+    e.mode = GIT_FILEMODE_BLOB;
+    e.path = path.c_str() + 1;
+
+    git_index *index;
+    CHECK_ERROR(git_repository_index(&index, repo));
+    CHECK_ERROR(git_index_add(index, &e));
+    CHECK_ERROR(git_index_write_tree(&tree_id, index));
+    git_index_free(index);
+
+    git_tree *tree;
+    CHECK_ERROR(git_tree_lookup(&tree, repo, &tree_id));
+
+    auto head = this->head();
+    CHECK_ERROR(git_commit_create_v(
+      &commit_id, repo, "HEAD", sig, sig,
+      nullptr, (std::string(msg) + " " + path).c_str(), tree, 1, head.get()
+    ));
+
+    git_tree_free(tree);
+    git_signature_free(sig);
+
+}
 void Git::truncate(const std::string &path, std::size_t size)
 {
     // TODO(twd2): this is a temporary implementation, rewrite it!
-    char tmp[256] = "sfstemp.XXXXXX";
+  /*  char tmp[256] = "sfstemp.XXXXXX";
     if (!mktemp(tmp)) // FIXME(twd2): Never use this function.
     {
         perror("mktemp");
@@ -142,7 +177,29 @@ void Git::truncate(const std::string &path, std::size_t size)
     dump(path, tmp);
     ::truncate(tmp, size);
     commit(tmp, path, "truncate");
-    unlink(tmp);
+    unlink(tmp);*/
+    assert(path.length() > 0 && path[0] == '/');
+    auto e = getEntry(path);
+    const git_otype type = git_tree_entry_type(e.get());
+    assert(type == GIT_OBJ_BLOB);
+    
+    git_object *obj_ = nullptr;
+    CHECK_ERROR(git_tree_entry_to_object(&obj_, repo, e.get()));
+    std::shared_ptr<git_blob> blob((git_blob *)obj_, [](git_blob *p) { git_blob_free(p); });
+    std::size_t oldsize = git_blob_rawsize(blob.get());
+    const void *data = git_blob_rawcontent(blob.get());
+    
+    git_oid new_blob_id;
+    if (size<=oldsize) {
+    	git_blob_create_frombuffer(&new_blob_id, repo, data, size);
+    } else {
+    	void *new_data = (void*)calloc(1,sizeof(char)*size);
+	memcpy(new_data,data,oldsize);
+	git_blob_create_frombuffer(&new_blob_id, repo, new_data, size);
+    	free(new_data);
+    }
+
+    commit(new_blob_id, path, "truncate"); 
 }
 
 Git::FileAttr Git::getAttr(const git_tree_entry *entry) const

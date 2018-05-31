@@ -82,6 +82,7 @@ public:
 
     void dump(const std::string &path, const std::string &out_path) const;
     void commit(const std::string &in_path, const std::string &path, const char *msg = "commit");
+    void commit(const git_oid &blob_id, const std::string &path, const char *msg="commit");
     void truncate(const std::string &path, std::size_t size);
 
     std::vector<FileAttr> listDir(const std::string &path) const;
