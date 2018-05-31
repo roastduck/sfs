@@ -13,11 +13,11 @@ int Git::checkErrorImpl(int error, const char *fn)
     if (error < 0)
     {
         const git_error *e = giterr_last();
-        throw Error(
-            error,
+        std::string msg =
             std::string(fn) + ": Error " + std::to_string(error) + "/" + std::to_string(e->klass) +
-            ": " + e->message
-        );
+            ": " + e->message;
+        printf("Git Error: %s\n", msg.c_str());
+        throw Error(error, msg);
     }
     return error;
 }

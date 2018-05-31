@@ -165,6 +165,37 @@ static int sfs_unlink(const char *path)
         return e.unixError();
     }
 }
+
+static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
+{
+    try
+    {
+        char tmp[] = "sfstemp.XXXXXX";
+        if (!mktemp(tmp)) // FIXME(twd2): Never use this function.
+        {
+            perror("mktemp");
+            exit(1);
+        }
+        OpenContext *ctx = new OpenContext(path, tmp);
+        fi->fh = (uint64_t)(void *)ctx;
+        ctx->fd = open(tmp, O_RDWR | O_CREAT | O_EXCL, 0600);
+        if (ctx->fd < 0)
+        {
+            perror("open");
+            delete ctx;
+            fi->fh = 0;
+            return -EIO;
+        }
+        ctx->dirty = true;
+        ctx->commit(*git, "create");
+        return 0;
+    }
+    catch (Git::Error e)
+    {
+        return e.unixError();
+    }
+}
+
 static struct fuse_operations sfs_ops;
 // CAUTIOUS: If you put `sfs_ops` in the stack, all the things will go wrong!
 
@@ -202,6 +233,7 @@ int main(int argc, char **argv)
     sfs_ops.write = sfs_write;
     sfs_ops.truncate = sfs_truncate;
     sfs_ops.unlink = sfs_unlink;
+    sfs_ops.create = sfs_create;
     return fuse_main(fuseArgc, fuseArgv, &sfs_ops, NULL);
 }
 
