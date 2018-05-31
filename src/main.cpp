@@ -142,10 +142,29 @@ static int sfs_write(const char *path, const char *buf, size_t size, off_t offse
 
 static int sfs_truncate(const char *path, off_t length)
 {
-    git->truncate(path, length);
-    return 0;
+    try
+    {
+        git->truncate(path, length);
+        return 0;
+    }
+    catch (Git::Error e)
+    {
+        return e.unixError();
+    }
 }
 
+static int sfs_unlink(const char *path)
+{
+    try
+    {
+        git->unlink(path);
+        return 0;
+    }
+    catch (Git::Error e)
+    {
+        return e.unixError();
+    }
+}
 static struct fuse_operations sfs_ops;
 // CAUTIOUS: If you put `sfs_ops` in the stack, all the things will go wrong!
 
@@ -182,7 +201,7 @@ int main(int argc, char **argv)
     sfs_ops.read = sfs_read;
     sfs_ops.write = sfs_write;
     sfs_ops.truncate = sfs_truncate;
-
+    sfs_ops.unlink = sfs_unlink;
     return fuse_main(fuseArgc, fuseArgv, &sfs_ops, NULL);
 }
 
