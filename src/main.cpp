@@ -96,7 +96,7 @@ struct OpenContext
     static OpenContext *find(const std::string &path);
 };
 
-static OpenContext *OpenContext::find(const std::string &path)
+OpenContext *OpenContext::find(const std::string &path)
 {
     auto iter = openContexts.find(path);
     if (iter == openContexts.end())
