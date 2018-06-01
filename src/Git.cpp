@@ -294,7 +294,8 @@ int Git::treeWalkCallback(const char *root, const git_tree_entry *entry, void *_
     UNUSED(ABORT);
 
     auto attr = payload->git->getAttr(entry);
-    payload->list.push_back(attr);
+    if (attr.name != GITKEEP_MAGIC)
+        payload->list.push_back(attr);
 
     return ((attr.stat.st_mode & S_IFMT) == S_IFDIR) ? SKIP : CONTINUE;
 }
