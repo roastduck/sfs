@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <fstream>
 #include <iostream>
+#include <unordered_map>
 #include <fuse.h>
 #include "Git.h"
 #include "OpenContext.h"
@@ -45,6 +46,67 @@ static int sfs_getattr(const char *path, struct stat *st)
     catch (Git::Error e)
     {
         return e.unixError();
+    }
+}
+
+struct OpenContext;
+
+std::unordered_map<std::string, OpenContext *> openContexts;
+
+struct OpenContext
+{
+    std::string path;
+    std::string tmpfile;
+    int fd = -1;
+    bool dirty = false;
+
+    explicit OpenContext(const std::string &path, const std::string &tmpfile) :
+        path(path), tmpfile(tmpfile)
+    {
+        openContexts[path] = this;
+    }
+
+    ~OpenContext()
+    {
+        openContexts.erase(path);
+        if (fd >= 0)
+        {
+            printf("close %d\n", fd);
+            close(fd);
+        }
+        if (tmpfile != "")
+        {
+            printf("unlink %s\n", tmpfile.c_str());
+            unlink(tmpfile.c_str());
+        }
+    }
+
+    void commit(Git &git, const char *msg)
+    {
+        if (dirty)
+        {
+            git.commit(tmpfile, path, msg);
+            dirty = false;
+        }
+        else
+        {
+            printf("not dirty\n");
+        }
+    }
+
+    static OpenContext *find(const std::string &path);
+};
+
+OpenContext *OpenContext::find(const std::string &path)
+{
+    auto iter = openContexts.find(path);
+    if (iter == openContexts.end())
+    {
+        return nullptr;
+    }
+    else
+    {
+        return iter->second;
     }
 }
 
