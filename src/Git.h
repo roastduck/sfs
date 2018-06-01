@@ -15,6 +15,12 @@
  */
 #define CHECK_ERROR(fn) Git::checkErrorImpl((fn), #fn)
 
+/** Helper for creating smart pointer
+ */
+#define BUILD_PTR(ptrName, gitVarName) \
+    struct Free##ptrName { void operator()(gitVarName *p) { if (p) gitVarName##_free(p); } }; \
+    using ptrName = std::unique_ptr<gitVarName, Free##ptrName>;
+
 /** Controller of a git repository
  */
 class Git
@@ -54,6 +60,18 @@ public:
     };
 
 private:
+    /** Pointer classes that automatically free objects when an exception is threw */
+    BUILD_PTR(IndexPtr, git_index);
+    BUILD_PTR(TreePtr, git_tree);
+    BUILD_PTR(SigPtr, git_signature);
+    BUILD_PTR(CommitPtr, git_commit);
+    BUILD_PTR(TreeEntryPtr, git_tree_entry);
+    BUILD_PTR(ObjectPtr, git_object);
+
+    TreePtr root(const char *spec = "HEAD^{tree}") const;
+    CommitPtr head(const char *spec = "HEAD") const;
+    TreeEntryPtr getEntry(const std::string &path) const;
+
     FileAttr getAttr(const git_tree_entry *entry) const;
 
     struct stat rootStat; /// Attributes of .git
@@ -76,10 +94,6 @@ public:
 
     ~Git();
 
-    std::shared_ptr<git_tree> root(const char *spec = "HEAD^{tree}") const;
-    std::shared_ptr<git_commit> head(const char *spec = "HEAD") const;
-    std::shared_ptr<git_tree_entry> getEntry(const std::string &path) const;
-
     void dump(const std::string &path, const std::string &out_path) const;
     void commit(const std::string &in_path, const std::string &path, const char *msg = "commit");
     void commit(const git_oid &blob_id, const std::string &path, const char *msg="commit");
@@ -89,6 +103,8 @@ public:
     std::vector<FileAttr> listDir(const std::string &path) const;
     FileAttr getAttr(const std::string &path) const;
 };
+
+#undef BUILD_PTR
 
 #endif // GIT_H_
 
