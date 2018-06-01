@@ -6,6 +6,7 @@
 #include <iostream>
 #include <fuse.h>
 #include "Git.h"
+#include "OpenContext.h"
 #include "3rd-party/json.hpp"
 
 using Json = nlohmann::json;
@@ -46,44 +47,6 @@ static int sfs_getattr(const char *path, struct stat *st)
         return e.unixError();
     }
 }
-
-struct OpenContext
-{
-    std::string path;
-    std::string tmpfile;
-    int fd = -1;
-    bool dirty = false;
-
-    explicit OpenContext(const std::string &path, const std::string &tmpfile) :
-        path(path), tmpfile(tmpfile) { }
-
-    ~OpenContext()
-    {
-        if (fd >= 0)
-        {
-            printf("close %d\n", fd);
-            close(fd);
-        }
-        if (tmpfile != "")
-        {
-            printf("unlink %s\n", tmpfile.c_str());
-            unlink(tmpfile.c_str());
-        }
-    }
-
-    void commit(Git &git, const char *msg)
-    {
-        if (dirty)
-        {
-            git.commit(tmpfile, path, msg);
-            dirty = false;
-        }
-        else
-        {
-            printf("not dirty\n");
-        }
-    }
-};
 
 static int sfs_open(const char *path, struct fuse_file_info *fi)
 {
