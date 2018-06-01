@@ -87,18 +87,30 @@ void Git::commit(const std::string &in_path, const std::string &path, const char
     CHECK_ERROR(git_signature_default(&sig_, repo));
     SigPtr sig(sig_);
 
-    git_oid blob_id, tree_id, commit_id;
-
+    git_oid blob_id;
     CHECK_ERROR(git_blob_create_fromdisk(&blob_id, repo, in_path.c_str()));
+    commit(blob_id, path, msg);
+}
+
+void Git::commit(const git_oid &blob_id, const std::string &path, const char *msg)
+{
+    assert(path.length() > 0 && path[0] == '/');
+
+    git_signature *sig_;
+    CHECK_ERROR(git_signature_default(&sig_, repo));
+    SigPtr sig(sig_);
+
     char idstr[256];
     memset(idstr, 0, sizeof(idstr));
     git_oid_fmt(idstr, &blob_id);
     printf("blob id %s\n", idstr);
 
+    git_oid tree_id, commit_id;
+
     git_index_entry e;
     memset(&e, 0, sizeof(e));
     e.id = blob_id;
-    e.mode = GIT_FILEMODE_BLOB;
+    e.mode = GIT_FILEMODE_BLOB; // TODO(twd2): when should we use GIT_FILEMODE_BLOB_EXECUTABLE?
     e.path = path.c_str() + 1;
     // TODO(twd2): more information
 
@@ -126,41 +138,6 @@ void Git::commit(const std::string &in_path, const std::string &path, const char
     memset(idstr, 0, sizeof(idstr));
     git_oid_fmt(idstr, &commit_id);
     printf("commit id %s\n", idstr);
-}
-
-// same as the commit(const std::string &in_path, const std::string &path, const char *msg)
-void Git::commit(const git_oid &blob_id, const std::string &path, const char *msg)
-{
-    assert(path.length() > 0 && path[0] == '/');
-
-    git_signature *sig_;
-    CHECK_ERROR(git_signature_default(&sig_, repo));
-    SigPtr sig(sig_);
-
-    git_oid tree_id, commit_id;
-
-    git_index_entry e;
-    memset(&e, 0, sizeof(e));
-    e.id = blob_id;
-    e.mode = GIT_FILEMODE_BLOB;
-    e.path = path.c_str() + 1;
-
-    git_index *index_;
-    CHECK_ERROR(git_repository_index(&index_, repo));
-    IndexPtr index(index_);
-    CHECK_ERROR(git_index_add(index.get(), &e));
-    CHECK_ERROR(git_index_write(index.get()));
-    CHECK_ERROR(git_index_write_tree(&tree_id, index.get()));
-
-    git_tree *tree_;
-    CHECK_ERROR(git_tree_lookup(&tree_, repo, &tree_id));
-    TreePtr tree(tree_);
-
-    auto head = this->head();
-    CHECK_ERROR(git_commit_create_v(
-      &commit_id, repo, "HEAD", sig.get(), sig.get(),
-      nullptr, (std::string(msg) + " " + path).c_str(), tree.get(), 1, head.get()
-    ));
 }
 
 void Git::commit_remove(const std::string &path, const char *msg)
@@ -193,18 +170,6 @@ void Git::commit_remove(const std::string &path, const char *msg)
 
 void Git::truncate(const std::string &path, std::size_t size)
 {
-    // TODO(twd2): this is a temporary implementation, rewrite it!
-  /*  char tmp[256] = "sfstemp.XXXXXX";
-    if (!mktemp(tmp)) // FIXME(twd2): Never use this function.
-    {
-        perror("mktemp");
-        exit(1);
-    }
-    printf("%s %s\n", path.c_str(), tmp);
-    dump(path, tmp);
-    ::truncate(tmp, size);
-    commit(tmp, path, "truncate");
-    unlink(tmp);*/
     assert(path.length() > 0 && path[0] == '/');
     auto e = getEntry(path);
     const git_otype type = git_tree_entry_type(e.get());
@@ -219,13 +184,14 @@ void Git::truncate(const std::string &path, std::size_t size)
     git_oid new_blob_id;
     if (size <= oldsize)
     {
-        git_blob_create_frombuffer(&new_blob_id, repo, data, size);
-    } else
+        CHECK_ERROR(git_blob_create_frombuffer(&new_blob_id, repo, data, size));
+    }
+    else
     {
-        void *new_data = (void*)calloc(1, sizeof(char)*size);
-        memcpy(new_data, data, oldsize);
-        git_blob_create_frombuffer(&new_blob_id, repo, new_data, size);
-        free(new_data);
+        std::unique_ptr<char []> new_data(new char[size]);
+        memcpy(new_data.get(), data, oldsize);
+        memset(new_data.get() + oldsize, 0, size - oldsize);
+        CHECK_ERROR(git_blob_create_frombuffer(&new_blob_id, repo, new_data.get(), size));
     }
 
     commit(new_blob_id, path, "truncate");
@@ -238,17 +204,17 @@ void Git::unlink(const std::string &path)
 
     const git_otype type = git_tree_entry_type(e.get());
 
-
     assert(type == GIT_OBJ_BLOB);
-    FileAttr attr=getAttr(e.get());
+    FileAttr attr = getAttr(e.get());
     if (attr.stat.st_nlink == 1)
     {
         // TODO: close file or dir
+        // TODO(twd2): what's this???
     }
 
-    commit_remove(path,"unlink");
-
+    commit_remove(path, "unlink");
 }
+
 Git::FileAttr Git::getAttr(const git_tree_entry *entry) const
 {
     FileAttr attr;

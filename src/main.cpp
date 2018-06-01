@@ -178,7 +178,7 @@ static int sfs_mkdir(const char *path, mode_t mode)
             return -EIO;
         }
         ctx.dirty = true;
-        ctx.commit(*git, "create");
+        ctx.commit(*git, "mkdir");
         return 0;
     }
     catch (Git::Error e)
