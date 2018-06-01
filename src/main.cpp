@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <fstream>
 #include <iostream>
+#include <unordered_map>
 #include <fuse.h>
 #include "Git.h"
 #include "3rd-party/json.hpp"
@@ -45,6 +46,10 @@ static int sfs_getattr(const char *path, struct stat *st)
     }
 }
 
+struct OpenContext;
+
+std::unordered_map<std::string, OpenContext *> openContexts;
+
 struct OpenContext
 {
     std::string path;
@@ -53,10 +58,14 @@ struct OpenContext
     bool dirty = false;
 
     explicit OpenContext(const std::string &path, const std::string &tmpfile) :
-        path(path), tmpfile(tmpfile) { }
+        path(path), tmpfile(tmpfile)
+    {
+        openContexts[path] = this;
+    }
 
     ~OpenContext()
     {
+        openContexts.erase(path);
         if (fd >= 0)
         {
             printf("close %d\n", fd);
@@ -81,7 +90,22 @@ struct OpenContext
             printf("not dirty\n");
         }
     }
+
+    static OpenContext *find(const std::string &path);
 };
+
+static OpenContext *OpenContext::find(const std::string &path)
+{
+    auto iter = openContexts.find(path);
+    if (iter == openContexts.end())
+    {
+        return nullptr;
+    }
+    else
+    {
+        return iter->second;
+    }
+}
 
 static int sfs_open(const char *path, struct fuse_file_info *fi)
 {
