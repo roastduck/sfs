@@ -26,8 +26,27 @@ Git::Git(const std::string &path)
 {
     if (++refCount == 1)
         CHECK_ERROR(git_libgit2_init());
+    try
+    {
+        CHECK_ERROR(git_repository_open_bare(&repo, path.c_str()));
+    } catch (const Error &e)
+    {
+        if (e.error() != GIT_ENOTFOUND)
+            throw e;
+        git_repository_init_options opts = GIT_REPOSITORY_INIT_OPTIONS_INIT;
+        opts.flags |= GIT_REPOSITORY_INIT_NO_REINIT;
+        opts.flags |= GIT_REPOSITORY_INIT_NO_DOTGIT_DIR;
+        opts.flags |= GIT_REPOSITORY_INIT_MKDIR;
+        opts.flags |= GIT_REPOSITORY_INIT_MKPATH;
+        CHECK_ERROR(git_repository_init_ext(&repo, path.c_str(), &opts));
+
+        git_index *index_;
+        CHECK_ERROR(git_repository_index(&index_, repo));
+        IndexPtr index(index_);
+
+        commit(index, nullptr, "Initial commit");
+    }
     stat(path.c_str(), &rootStat);
-    CHECK_ERROR(git_repository_open_bare(&repo, path.c_str()));
 }
 
 Git::~Git()
@@ -83,10 +102,6 @@ void Git::commit(const std::string &in_path, const std::string &path, const char
 {
     assert(path.length() > 0 && path[0] == '/');
 
-    git_signature *sig_;
-    CHECK_ERROR(git_signature_default(&sig_, repo));
-    SigPtr sig(sig_);
-
     git_oid blob_id;
     CHECK_ERROR(git_blob_create_fromdisk(&blob_id, repo, in_path.c_str()));
     commit(blob_id, path, msg);
@@ -96,16 +111,10 @@ void Git::commit(const git_oid &blob_id, const std::string &path, const char *ms
 {
     assert(path.length() > 0 && path[0] == '/');
 
-    git_signature *sig_;
-    CHECK_ERROR(git_signature_default(&sig_, repo));
-    SigPtr sig(sig_);
-
     char idstr[256];
     memset(idstr, 0, sizeof(idstr));
     git_oid_fmt(idstr, &blob_id);
     printf("blob id %s\n", idstr);
-
-    git_oid tree_id, commit_id;
 
     git_index_entry e;
     memset(&e, 0, sizeof(e));
@@ -119,6 +128,19 @@ void Git::commit(const git_oid &blob_id, const std::string &path, const char *ms
     IndexPtr index(index_);
     CHECK_ERROR(git_index_add(index.get(), &e));
     CHECK_ERROR(git_index_write(index.get()));
+
+    commit(index, this->head(), (std::string(msg) + " " + path).c_str());
+}
+
+void Git::commit(const IndexPtr &index, const CommitPtr &head, const char *msg)
+{
+    char idstr[256];
+    git_oid tree_id, commit_id;
+
+    git_signature *sig_;
+    CHECK_ERROR(git_signature_default(&sig_, repo));
+    SigPtr sig(sig_);
+
     CHECK_ERROR(git_index_write_tree(&tree_id, index.get()));
 
     memset(idstr, 0, sizeof(idstr));
@@ -129,10 +151,9 @@ void Git::commit(const git_oid &blob_id, const std::string &path, const char *ms
     CHECK_ERROR(git_tree_lookup(&tree_, repo, &tree_id));
     TreePtr tree(tree_);
 
-    auto head = this->head();
     CHECK_ERROR(git_commit_create_v(
       &commit_id, repo, "HEAD", sig.get(), sig.get(),
-      nullptr, (std::string(msg) + " " + path).c_str(), tree.get(), 1, head.get()
+      nullptr, msg, tree.get(), 1, head.get()
     ));
 
     memset(idstr, 0, sizeof(idstr));

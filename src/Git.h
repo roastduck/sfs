@@ -86,6 +86,9 @@ private:
      */
     static int treeWalkCallback(const char *root, const git_tree_entry *entry, void *_payload);
 
+    void commit(const git_oid &blob_id, const std::string &path, const char *msg="commit");
+    void commit(const IndexPtr &index, const CommitPtr &head, const char *msg);
+
 public:
     git_repository *repo;
 
@@ -98,7 +101,6 @@ public:
 
     void dump(const std::string &path, const std::string &out_path) const;
     void commit(const std::string &in_path, const std::string &path, const char *msg = "commit");
-    void commit(const git_oid &blob_id, const std::string &path, const char *msg="commit");
     void commit_remove(const std::string &path, const char *msg="commit");
     void truncate(const std::string &path, std::size_t size);
     void unlink(const std::string &path);
