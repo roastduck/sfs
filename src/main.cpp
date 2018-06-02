@@ -27,7 +27,7 @@ static int sfs_readdir(
             filler(buf, item.name.c_str(), &item.stat, 0 /* Offset disabled */);
         return 0;
     }
-    catch (Git::Error e)
+    catch (const Git::Error &e)
     {
         return e.unixError();
     }
@@ -40,7 +40,7 @@ static int sfs_getattr(const char *path, struct stat *st)
         *st = git->getAttr(path).stat;
         return 0;
     }
-    catch (Git::Error e)
+    catch (const Git::Error &e)
     {
         return e.unixError();
     }
@@ -70,7 +70,7 @@ static int sfs_open(const char *path, struct fuse_file_info *fi)
         }
         return 0;
     }
-    catch (Git::Error e)
+    catch (const Git::Error &e)
     {
         return e.unixError();
     }
@@ -110,7 +110,7 @@ static int sfs_truncate(const char *path, off_t length)
         git->truncate(path, length);
         return 0;
     }
-    catch (Git::Error e)
+    catch (const Git::Error &e)
     {
         return e.unixError();
     }
@@ -123,7 +123,7 @@ static int sfs_unlink(const char *path)
         git->unlink(path);
         return 0;
     }
-    catch (Git::Error e)
+    catch (const Git::Error &e)
     {
         return e.unixError();
     }
@@ -131,6 +131,7 @@ static int sfs_unlink(const char *path)
 
 static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
+    // TODO(tsz): Use `mode`
     try
     {
         char tmp[] = "sfstemp.XXXXXX";
@@ -153,7 +154,7 @@ static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
         ctx->commit(*git, "create");
         return 0;
     }
-    catch (Git::Error e)
+    catch (const Git::Error &e)
     {
         return e.unixError();
     }
@@ -161,6 +162,7 @@ static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 static int sfs_mkdir(const char *path, mode_t mode)
 {
+    // TODO(tsz): Use `mode`
     try
     {
         std::string gitKeep = std::string(path) + "/" + Git::GITKEEP_MAGIC;
@@ -181,7 +183,7 @@ static int sfs_mkdir(const char *path, mode_t mode)
         ctx.commit(*git, "mkdir");
         return 0;
     }
-    catch (Git::Error e)
+    catch (const Git::Error &e)
     {
         return e.unixError();
     }
@@ -196,7 +198,7 @@ static int sfs_rmdir(const char *path)
         git->unlink(std::string(path) + "/" + Git::GITKEEP_MAGIC);
         return 0;
     }
-    catch (Git::Error e)
+    catch (const Git::Error &e)
     {
         return e.unixError();
     }
