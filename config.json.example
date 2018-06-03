@@ -1,5 +1,6 @@
 {
     "git_path": "/path/to/.git",
+    "read_only": false,
     "fuse_args": ["-d", "/path/to/your/mounting/point"],
     "commit_on_write": false
 }

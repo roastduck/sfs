@@ -13,7 +13,10 @@ using Json = nlohmann::json;
 
 Json config;
 Git *git;
-bool commit_on_write = false;
+bool commit_on_write = false, read_only = false;
+
+#define CHECK_READONLY() \
+    do { if (read_only) return -EROFS; } while (0)
 
 static int sfs_readdir(
     const char *path, void *buf, fuse_fill_dir_t filler,
@@ -94,6 +97,7 @@ static int sfs_read(const char *path, char *buf, size_t size, off_t offset, stru
 
 static int sfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
+    CHECK_READONLY();
     OpenContext *ctx = (OpenContext *)(void *)fi->fh;
     int ret;
     if ((ret = lseek(ctx->fd, offset, SEEK_SET)) < 0) return ret;
@@ -105,6 +109,7 @@ static int sfs_write(const char *path, const char *buf, size_t size, off_t offse
 
 static int sfs_truncate(const char *path, off_t length)
 {
+    CHECK_READONLY();
     try
     {
         git->truncate(path, length);
@@ -118,6 +123,7 @@ static int sfs_truncate(const char *path, off_t length)
 
 static int sfs_unlink(const char *path)
 {
+    CHECK_READONLY();
     try
     {
         git->unlink(path);
@@ -131,7 +137,7 @@ static int sfs_unlink(const char *path)
 
 static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-    // TODO(sth): Use `mode`
+    CHECK_READONLY();
     try
     {
         char tmp[] = "sfstemp.XXXXXX";
@@ -151,6 +157,7 @@ static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
             return -EIO;
         }
         ctx->dirty = true;
+        // TODO(sth): Use `mode`
         ctx->commit(*git, "create");
         return 0;
     }
@@ -162,6 +169,7 @@ static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 static int sfs_mkdir(const char *path, mode_t mode)
 {
+    CHECK_READONLY();
     try
     {
         std::string gitKeep = std::string(path) + "/" + Git::GITKEEP_MAGIC;
@@ -190,6 +198,7 @@ static int sfs_mkdir(const char *path, mode_t mode)
 
 static int sfs_rmdir(const char *path)
 {
+    CHECK_READONLY();
     try
     {
         if (!git->listDir(path).empty())
@@ -215,6 +224,7 @@ static int sfs_releasedir(const char* path, struct fuse_file_info* f)
 
 static int sfs_chmod(const char* path, mode_t mode)
 {
+    CHECK_READONLY();
     bool executable = (mode & (S_IXUSR | S_IXGRP | S_IXOTH));
     try
     {
@@ -244,6 +254,7 @@ int main(int argc, char **argv)
     } // Here the file closes
 
     commit_on_write = config["commit_on_write"].get<bool>();
+    read_only = config["read_only"].get<bool>();
 
     git = new Git(config["git_path"].get<std::string>()); // Will not be deleted
 
