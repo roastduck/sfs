@@ -131,7 +131,7 @@ static int sfs_unlink(const char *path)
 
 static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-    // TODO(tsz): Use `mode`
+    // TODO(sth): Use `mode`
     try
     {
         char tmp[] = "sfstemp.XXXXXX";
@@ -162,7 +162,6 @@ static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 static int sfs_mkdir(const char *path, mode_t mode)
 {
-    // TODO(tsz): Use `mode`
     try
     {
         std::string gitKeep = std::string(path) + "/" + Git::GITKEEP_MAGIC;
