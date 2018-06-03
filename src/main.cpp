@@ -215,7 +215,7 @@ static int sfs_releasedir(const char* path, struct fuse_file_info* f)
 
 static int sfs_chmod(const char* path, mode_t mode)
 {
-    bool executable = ((mode & S_IXUSR) || (mode & S_IXGRP) || (mode & S_IXOTH));
+    bool executable = (mode & (S_IXUSR | S_IXGRP | S_IXOTH));
     try
     {
         git->chmod(std::string(path), mode, executable);
@@ -225,7 +225,6 @@ static int sfs_chmod(const char* path, mode_t mode)
     {
         return e.unixError();
     }
-
 }
 
 static struct fuse_operations sfs_ops;
