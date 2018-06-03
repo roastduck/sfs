@@ -206,29 +206,16 @@ static int sfs_rmdir(const char *path)
 
 static int sfs_opendir(const char* path, struct fuse_file_info* f)
 {
-    printf("open dir!!!!\n");
-    printf("%s\n", path);
     return 0;
 }
 
 static int sfs_releasedir(const char* path, struct fuse_file_info* f)
 {
-    printf("release dir!!!!!\n");
-    printf("%s\n", path);
     return 0;
 }
 
 static int sfs_chmod(const char* path, mode_t mode)
 {
-    printf("chmod !!!!!!!!\n");
-    printf("mode = %d\n", mode);
-    printf("owner:\n");
-    printf("%d %d %d\n", mode & S_IRUSR, mode & S_IWUSR, mode &S_IXUSR);
-    printf("group:\n");
-    printf("%d %d %d\n", mode & S_IRGRP, mode & S_IWGRP, mode &S_IXGRP);
-    printf("other:\n");
-    printf("%d %d %d\n", mode & S_IROTH, mode & S_IWOTH, mode &S_IXOTH);
-    printf("%s\n", path);
     bool executable = ((mode & S_IXUSR) || (mode & S_IXGRP) || (mode & S_IXOTH));
     try
     {
