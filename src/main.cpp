@@ -204,6 +204,44 @@ static int sfs_rmdir(const char *path)
     }
 }
 
+static int sfs_opendir(const char* path, struct fuse_file_info* f)
+{
+    printf("open dir!!!!\n");
+    printf("%s\n", path);
+    return 0;
+}
+
+static int sfs_releasedir(const char* path, struct fuse_file_info* f)
+{
+    printf("release dir!!!!!\n");
+    printf("%s\n", path);
+    return 0;
+}
+
+static int sfs_chmod(const char* path, mode_t mode)
+{
+    printf("chmod !!!!!!!!\n");
+    printf("mode = %d\n", mode);
+    printf("owner:\n");
+    printf("%d %d %d\n", mode & S_IRUSR, mode & S_IWUSR, mode &S_IXUSR);
+    printf("group:\n");
+    printf("%d %d %d\n", mode & S_IRGRP, mode & S_IWGRP, mode &S_IXGRP);
+    printf("other:\n");
+    printf("%d %d %d\n", mode & S_IROTH, mode & S_IWOTH, mode &S_IXOTH);
+    printf("%s\n", path);
+    bool executable = ((mode & S_IXUSR) || (mode & S_IXGRP) || (mode & S_IXOTH));
+    try
+    {
+        git->chmod(std::string(path), mode, executable);
+        return 0;
+    }
+    catch (const Git::Error &e)
+    {
+        return e.unixError();
+    }
+
+}
+
 static struct fuse_operations sfs_ops;
 // CAUTIOUS: If you put `sfs_ops` in the stack, all the things will go wrong!
 
@@ -244,6 +282,9 @@ int main(int argc, char **argv)
     sfs_ops.create = sfs_create;
     sfs_ops.mkdir = sfs_mkdir;
     sfs_ops.rmdir = sfs_rmdir;
+    sfs_ops.opendir = sfs_opendir;
+    sfs_ops.releasedir = sfs_releasedir;
+    sfs_ops.chmod = sfs_chmod;
     return fuse_main(fuseArgc, fuseArgv, &sfs_ops, NULL);
 }
 

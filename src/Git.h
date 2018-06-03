@@ -86,7 +86,7 @@ private:
      */
     static int treeWalkCallback(const char *root, const git_tree_entry *entry, void *_payload);
 
-    void commit(const git_oid &blob_id, const std::string &path, const char *msg="commit");
+    void commit(const git_oid &blob_id, const std::string &path, const char *msg="commit", const bool executable = false);
     void commit(const IndexPtr &index, const CommitPtr &head, const char *msg);
 
 public:
@@ -106,6 +106,7 @@ public:
     void unlink(const std::string &path);
     std::vector<FileAttr> listDir(const std::string &path) const;
     FileAttr getAttr(const std::string &path) const;
+    void chmod(const std::string &path, const mode_t mode, const bool executable);
 };
 
 #undef BUILD_PTR

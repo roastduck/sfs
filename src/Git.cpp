@@ -107,7 +107,7 @@ void Git::commit(const std::string &in_path, const std::string &path, const char
     commit(blob_id, path, msg);
 }
 
-void Git::commit(const git_oid &blob_id, const std::string &path, const char *msg)
+void Git::commit(const git_oid &blob_id, const std::string &path, const char *msg, const bool executable)
 {
     assert(path.length() > 0 && path[0] == '/');
 
@@ -119,7 +119,10 @@ void Git::commit(const git_oid &blob_id, const std::string &path, const char *ms
     git_index_entry e;
     memset(&e, 0, sizeof(e));
     e.id = blob_id;
-    e.mode = GIT_FILEMODE_BLOB; // TODO(twd2): when should we use GIT_FILEMODE_BLOB_EXECUTABLE?
+    if (executable)
+        e.mode = GIT_FILEMODE_BLOB_EXECUTABLE;
+    else
+        e.mode = GIT_FILEMODE_BLOB;
     e.path = path.c_str() + 1;
     // TODO(twd2): more information
 
@@ -324,3 +327,14 @@ Git::FileAttr Git::getAttr(const std::string &path) const
     return attr;
 }
 
+void Git::chmod(const std::string &path, const mode_t mode, const bool executable)
+{
+    auto e = getEntry(path);
+    const git_otype type = git_tree_entry_type(e.get());
+    assert(type == GIT_OBJ_BLOB);
+    git_object *obj_ = nullptr;
+    CHECK_ERROR(git_tree_entry_to_object(&obj_, repo, e.get()));
+    ObjectPtr obj(obj_);
+    const git_oid* id = git_blob_id((git_blob*)(obj.get()));
+    commit(*id, path, "chmod", executable);
+}
