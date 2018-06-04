@@ -229,6 +229,19 @@ static int sfs_chmod(const char* path, mode_t mode)
 
 }
 
+static int sfs_rename(const char* oldname, const char* newname)
+{
+    try
+    {
+        git->rename(std::string(oldname), std::string(newname));
+        return 0;
+    }
+    catch (const Git::Error &e)
+    {
+        return e.unixError();
+    }
+}
+
 static struct fuse_operations sfs_ops;
 // CAUTIOUS: If you put `sfs_ops` in the stack, all the things will go wrong!
 
@@ -272,6 +285,7 @@ int main(int argc, char **argv)
     sfs_ops.opendir = sfs_opendir;
     sfs_ops.releasedir = sfs_releasedir;
     sfs_ops.chmod = sfs_chmod;
+    sfs_ops.rename = sfs_rename;
     return fuse_main(fuseArgc, fuseArgv, &sfs_ops, NULL);
 }
 

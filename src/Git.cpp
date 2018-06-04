@@ -5,6 +5,7 @@
 #include <iostream>
 #include "Git.h"
 #include "utils.h"
+#include <vector>
 
 int Git::refCount = 0;
 
@@ -337,4 +338,67 @@ void Git::chmod(const std::string &path, const mode_t mode, const bool executabl
     ObjectPtr obj(obj_);
     const git_oid* id = git_blob_id((git_blob*)(obj.get()));
     commit(*id, path, "chmod", executable);
+}
+
+void Git::rename(const std::string &oldname, const std::string &newname)
+{
+    assert(oldname.length() > 0 && oldname[0] == '/');
+    assert(newname.length() > 0 && newname[0] == '/');
+    auto e = getEntry(oldname);
+    const git_otype type = git_tree_entry_type(e.get());
+    assert(type == GIT_OBJ_BLOB || type == GIT_OBJ_TREE);
+    git_index *index_;
+    CHECK_ERROR(git_repository_index(&index_, repo));
+    IndexPtr index(index_);
+    size_t pos;
+    if (type == GIT_OBJ_BLOB)
+    {
+        CHECK_ERROR(git_index_find_prefix(&pos, index.get(), oldname.c_str() + 1));
+        const git_index_entry* entry = git_index_get_byindex(index.get(), pos);
+        git_index_entry e;
+        memset(&e, 0, sizeof(e));
+        e.id = entry->id;
+        e.mode = entry->mode;
+        e.path = newname.c_str() + 1;
+        CHECK_ERROR(git_index_add(index.get(), &e));
+        CHECK_ERROR(git_index_remove_bypath(index.get(), entry->path));
+    }
+    else // type == GIT_OBJ_TREE
+    {
+        std::vector<git_index_entry> new_entry_list;
+        new_entry_list.clear();
+        std::string str;
+        std::string _oldname = std::string(oldname.c_str() + 1) + '/';
+        std::string _newname = std::string(newname.c_str() + 1) + '/';
+        CHECK_ERROR(git_index_find_prefix(&pos, index.get(), _oldname.c_str()));
+        const git_index_entry* entry = git_index_get_byindex(index.get(), pos);
+        str = std::string(entry->path);
+        size_t find_pos = str.find(_oldname);
+        while (1)
+        {
+            git_index_entry e;
+            memset(&e, 0, sizeof(e));
+            e.id = entry->id;
+            e.mode = entry->mode;
+            str = str.replace(find_pos, _oldname.length(), _newname);
+            char* tmp_cstr = new char[str.length() + 1];
+            strcpy(tmp_cstr, str.c_str());
+            e.path = tmp_cstr;
+            new_entry_list.push_back(e);
+            CHECK_ERROR(git_index_remove_bypath(index.get(), entry->path));
+            git_index_entry tmpe = new_entry_list.back();
+            
+            //next entry
+            entry = git_index_get_byindex(index.get(), pos);
+            str = std::string(entry->path);
+            find_pos = str.find(_oldname);
+            if (find_pos != 0)
+                break;
+        }
+        for (auto e : new_entry_list)
+            CHECK_ERROR(git_index_add(index.get(), &e));
+    }
+
+    CHECK_ERROR(git_index_write(index.get()));
+    commit(index, this->head(), ("rename " + oldname + " to " + newname).c_str());
 }
