@@ -22,7 +22,7 @@ public:
 
     ~OpenContext();
 
-    void commit(Git &git, const char *msg);
+    void commit(Git &git, const char *msg, bool executable = false);
 
     static OpenContext *find(const std::string &path);
 };

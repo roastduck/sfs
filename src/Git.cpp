@@ -99,13 +99,13 @@ void Git::dump(const std::string &path, const std::string &out_path) const
     fout.close();
 }
 
-void Git::commit(const std::string &in_path, const std::string &path, const char *msg)
+void Git::commit(const std::string &in_path, const std::string &path, const char *msg, bool executable)
 {
     assert(path.length() > 0 && path[0] == '/');
 
     git_oid blob_id;
     CHECK_ERROR(git_blob_create_fromdisk(&blob_id, repo, in_path.c_str()));
-    commit(blob_id, path, msg);
+    commit(blob_id, path, msg, executable);
 }
 
 void Git::commit(const git_oid &blob_id, const std::string &path, const char *msg, const bool executable)

@@ -26,11 +26,11 @@ OpenContext::~OpenContext()
     }
 }
 
-void OpenContext::commit(Git &git, const char *msg)
+void OpenContext::commit(Git &git, const char *msg, bool executable)
 {
     if (dirty)
     {
-        git.commit(tmpfile, path, msg);
+        git.commit(tmpfile, path, msg, executable);
         dirty = false;
     }
     else

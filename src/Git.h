@@ -100,7 +100,7 @@ public:
     ~Git();
 
     void dump(const std::string &path, const std::string &out_path) const;
-    void commit(const std::string &in_path, const std::string &path, const char *msg = "commit");
+    void commit(const std::string &in_path, const std::string &path, const char *msg = "commit", bool executable = false);
     void commit_remove(const std::string &path, const char *msg="commit");
     void truncate(const std::string &path, std::size_t size);
     void unlink(const std::string &path);

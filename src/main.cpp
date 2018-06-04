@@ -157,8 +157,8 @@ static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
             return -EIO;
         }
         ctx->dirty = true;
-        // TODO(sth): Use `mode`
-        ctx->commit(*git, "create");
+        bool executable = (mode & (S_IXUSR | S_IXGRP | S_IXOTH));
+        ctx->commit(*git, "create", executable);
         return 0;
     }
     catch (const Git::Error &e)
