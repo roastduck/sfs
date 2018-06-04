@@ -337,7 +337,7 @@ void Git::chmod(const std::string &path, const mode_t mode, const bool executabl
     CHECK_ERROR(git_tree_entry_to_object(&obj_, repo, e.get()));
     ObjectPtr obj(obj_);
     const git_oid* id = git_blob_id((git_blob*)(obj.get()));
-    commit(*id, path, "chmod", executable);
+    commit(*id, path, executable ? "chmod +x" : "chmod -x", executable);
 }
 
 void Git::rename(const std::string &oldname, const std::string &newname)
