@@ -82,6 +82,28 @@ Git::TreeEntryPtr Git::getEntry(const std::string &path) const
     return TreeEntryPtr(e);
 }
 
+void Git::checkSig() const
+{
+    git_signature *sig;
+    if (git_signature_default(&sig, repo) < 0)
+    {
+        std::cerr << std::endl
+            << "*** Please tell me who you are." << std::endl
+            << std::endl
+            << "Run" << std::endl
+            << std::endl
+            << "  git config --global user.email \"you@example.com\"" << std::endl
+            << "  git config --global user.name \"Your Name\"" << std::endl
+            << std::endl
+            << "to set your account's default identity." << std::endl << std::endl;
+        exit(1);
+    }
+    else
+    {
+        git_signature_free(sig);
+    }
+}
+
 void Git::dump(const std::string &path, const std::string &out_path) const
 {
     // TODO(twd2): cache

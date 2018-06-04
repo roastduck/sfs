@@ -270,6 +270,7 @@ int main(int argc, char **argv)
     read_only = config["read_only"].get<bool>();
 
     git = new Git(config["git_path"].get<std::string>()); // Will not be deleted
+    git->checkSig();
 
     std::vector<std::string> fuseArgs = config["fuse_args"];
     fuseArgs.insert(fuseArgs.begin(), argv[0]);
