@@ -10,11 +10,6 @@
 #include <sys/types.h>
 #include <memory>
 
-/** Check libgit2 error code
- *  !!!!! PLEASE WRAP ANY CALL TO libgit2 WITH THIS MACRO !!!!!
- */
-#define CHECK_ERROR(fn) Git::checkErrorImpl((fn), #fn)
-
 /** Helper for creating smart pointer
  */
 #define BUILD_PTR(ptrName, gitVarName) \
@@ -106,7 +101,7 @@ public:
                 bool executable = false);
     void commit_remove(const std::string &path, const char *msg = "commit");
     void truncate(const std::string &path, std::size_t size);
-    void unlink(const std::string &path);
+    void unlink(const std::string &path, const char *msg = "unlink");
     std::vector<FileAttr> listDir(const std::string &path) const;
     FileAttr getAttr(const std::string &path) const;
     void chmod(const std::string &path, const mode_t mode, const bool executable);

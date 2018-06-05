@@ -215,7 +215,7 @@ static int sfs_rmdir(const char *path)
     {
         if (!git->listDir(path_mangle(path)).empty())
             return -ENOTEMPTY;
-        git->unlink(path_mangle(path) + "/" + Git::GITKEEP_MAGIC);
+        git->unlink(path_mangle(path) + "/" + Git::GITKEEP_MAGIC, "rmdir");
         return 0;
     }
     catch (const Git::Error &e)

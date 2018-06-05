@@ -23,6 +23,11 @@ int Git::checkErrorImpl(int error, const char *fn)
     return error;
 }
 
+/** Check libgit2 error code
+ *  !!!!! PLEASE WRAP ANY CALL TO libgit2 WITH THIS MACRO !!!!!
+ */
+#define CHECK_ERROR(fn) Git::checkErrorImpl((fn), #fn)
+
 Git::Git(const std::string &path)
 {
     if (++refCount == 1)
@@ -153,7 +158,6 @@ void Git::commit(const git_oid &blob_id, const std::string &path, const char *ms
     CHECK_ERROR(git_repository_index(&index_, repo));
     IndexPtr index(index_);
     CHECK_ERROR(git_index_add(index.get(), &e));
-    CHECK_ERROR(git_index_write(index.get()));
 
     commit(index, this->head(), (std::string(msg) + " " + path).c_str());
 }
@@ -167,6 +171,7 @@ void Git::commit(const IndexPtr &index, const CommitPtr &head, const char *msg)
     CHECK_ERROR(git_signature_default(&sig_, repo));
     SigPtr sig(sig_);
 
+    CHECK_ERROR(git_index_write(index.get()));
     CHECK_ERROR(git_index_write_tree(&tree_id, index.get()));
 
     memset(idstr, 0, sizeof(idstr));
@@ -191,28 +196,12 @@ void Git::commit_remove(const std::string &path, const char *msg)
 {
     assert(path.length() > 0 && path[0] == '/');
 
-    git_signature *sig_;
-    CHECK_ERROR(git_signature_default(&sig_, repo));
-    SigPtr sig(sig_);
-
-    git_oid tree_id, commit_id;
-
     git_index *index_;
     CHECK_ERROR(git_repository_index(&index_, repo));
     IndexPtr index(index_);
     CHECK_ERROR(git_index_remove_bypath(index.get(), path.c_str() + 1));
-    CHECK_ERROR(git_index_write(index.get()));
-    CHECK_ERROR(git_index_write_tree(&tree_id, index.get()));
 
-    git_tree *tree_;
-    CHECK_ERROR(git_tree_lookup(&tree_, repo, &tree_id));
-    TreePtr tree(tree_);
-
-    auto head = this->head();
-    CHECK_ERROR(git_commit_create_v(
-      &commit_id, repo, "HEAD", sig.get(), sig.get(),
-      nullptr, (std::string(msg) + " " + path).c_str(), tree.get(), 1, head.get()
-    ));
+    commit(index, this->head(), (std::string(msg) + " " + path).c_str());
 }
 
 void Git::truncate(const std::string &path, std::size_t size)
@@ -244,7 +233,7 @@ void Git::truncate(const std::string &path, std::size_t size)
     commit(new_blob_id, path, "truncate");
 }
 
-void Git::unlink(const std::string &path)
+void Git::unlink(const std::string &path, const char *msg)
 {
     assert(path.length() > 0 && path[0] == '/');
     auto e = getEntry(path);
@@ -259,7 +248,7 @@ void Git::unlink(const std::string &path)
         // TODO(twd2): what's this???
     }
 
-    commit_remove(path, "unlink");
+    commit_remove(path, msg);
 }
 
 Git::FileAttr Git::getAttr(const git_tree_entry *entry) const
@@ -421,6 +410,7 @@ void Git::rename(const std::string &oldname, const std::string &newname)
             CHECK_ERROR(git_index_add(index.get(), &e));
     }
 
-    CHECK_ERROR(git_index_write(index.get()));
     commit(index, this->head(), ("rename " + oldname + " to " + newname).c_str());
 }
+
+#undef CHECK_ERROR
