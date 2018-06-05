@@ -18,6 +18,18 @@ bool commit_on_write = false, read_only = false;
 #define CHECK_READONLY() \
     do { if (read_only) return -EROFS; } while (0)
 
+std::string path_mangle(const std::string &path)
+{
+    // TODO(ltl)
+    return path;
+}
+
+std::string path_demangle(const std::string &path)
+{
+    // TODO(ltl)
+    return path;
+}
+
 static int sfs_readdir(
     const char *path, void *buf, fuse_fill_dir_t filler,
     off_t offset, struct fuse_file_info *fi
@@ -25,9 +37,9 @@ static int sfs_readdir(
 {
     try
     {
-        auto list = git->listDir(path);
+        auto list = git->listDir(path_mangle(path));
         for (const auto &item : list)
-            filler(buf, item.name.c_str(), &item.stat, 0 /* Offset disabled */);
+            filler(buf, path_demangle(item.name).c_str(), &item.stat, 0 /* Offset disabled */);
         return 0;
     }
     catch (const Git::Error &e)
@@ -40,7 +52,7 @@ static int sfs_getattr(const char *path, struct stat *st)
 {
     try
     {
-        *st = git->getAttr(path).stat;
+        *st = git->getAttr(path_mangle(path)).stat;
         return 0;
     }
     catch (const Git::Error &e)
@@ -59,9 +71,9 @@ static int sfs_open(const char *path, struct fuse_file_info *fi)
             perror("mktemp");
             exit(1);
         }
-        git->dump(path, tmp);
+        git->dump(path_mangle(path), tmp);
         printf("dumped %s\n", tmp);
-        OpenContext *ctx = new OpenContext(path, tmp);
+        OpenContext *ctx = new OpenContext(path_mangle(path), tmp);
         fi->fh = (uint64_t)(void *)ctx;
         ctx->fd = open(tmp, O_RDWR);
         if (ctx->fd < 0)
@@ -112,7 +124,7 @@ static int sfs_truncate(const char *path, off_t length)
     CHECK_READONLY();
     try
     {
-        git->truncate(path, length);
+        git->truncate(path_mangle(path), length);
         return 0;
     }
     catch (const Git::Error &e)
@@ -126,7 +138,7 @@ static int sfs_unlink(const char *path)
     CHECK_READONLY();
     try
     {
-        git->unlink(path);
+        git->unlink(path_mangle(path));
         return 0;
     }
     catch (const Git::Error &e)
@@ -146,7 +158,7 @@ static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
             perror("mktemp");
             exit(1);
         }
-        OpenContext *ctx = new OpenContext(path, tmp);
+        OpenContext *ctx = new OpenContext(path_mangle(path), tmp);
         fi->fh = (uint64_t)(void *)ctx;
         ctx->fd = open(tmp, O_RDWR | O_CREAT | O_EXCL, 0600);
         if (ctx->fd < 0)
@@ -172,7 +184,7 @@ static int sfs_mkdir(const char *path, mode_t mode)
     CHECK_READONLY();
     try
     {
-        std::string gitKeep = std::string(path) + "/" + Git::GITKEEP_MAGIC;
+        std::string gitKeep = path_mangle(path) + "/" + Git::GITKEEP_MAGIC;
         char tmp[] = "sfstemp.XXXXXX";
         if (!mktemp(tmp)) // FIXME(tsz): Never use this function.
         {
@@ -201,9 +213,9 @@ static int sfs_rmdir(const char *path)
     CHECK_READONLY();
     try
     {
-        if (!git->listDir(path).empty())
+        if (!git->listDir(path_mangle(path)).empty())
             return -ENOTEMPTY;
-        git->unlink(std::string(path) + "/" + Git::GITKEEP_MAGIC);
+        git->unlink(path_mangle(path) + "/" + Git::GITKEEP_MAGIC);
         return 0;
     }
     catch (const Git::Error &e)
@@ -228,7 +240,7 @@ static int sfs_chmod(const char* path, mode_t mode)
     bool executable = (mode & (S_IXUSR | S_IXGRP | S_IXOTH));
     try
     {
-        git->chmod(std::string(path), mode, executable);
+        git->chmod(path_mangle(path), mode, executable);
         return 0;
     }
     catch (const Git::Error &e)
@@ -242,7 +254,7 @@ static int sfs_rename(const char* oldname, const char* newname)
     CHECK_READONLY();
     try
     {
-        git->rename(std::string(oldname), std::string(newname));
+        git->rename(path_mangle(oldname), path_mangle(newname));
         return 0;
     }
     catch (const Git::Error &e)
