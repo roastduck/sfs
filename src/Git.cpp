@@ -381,9 +381,7 @@ void Git::rename(const std::string &oldname, const std::string &newname)
         CHECK_ERROR(git_index_find_prefix(&pos, index.get(), oldname.c_str() + 1));
         const git_index_entry* entry = git_index_get_byindex(index.get(), pos);
         git_index_entry e;
-        memset(&e, 0, sizeof(e));
-        e.id = entry->id;
-        e.mode = entry->mode;
+        memcpy(&e, entry, sizeof(e));
         e.path = newname.c_str() + 1;
         CHECK_ERROR(git_index_add(index.get(), &e));
         CHECK_ERROR(git_index_remove_bypath(index.get(), entry->path));
@@ -402,9 +400,7 @@ void Git::rename(const std::string &oldname, const std::string &newname)
         while (1)
         {
             git_index_entry e;
-            memset(&e, 0, sizeof(e));
-            e.id = entry->id;
-            e.mode = entry->mode;
+            memcpy(&e, entry, sizeof(e));
             str = str.replace(find_pos, _oldname.length(), _newname);
             char* tmp_cstr = new char[str.length() + 1];
             strcpy(tmp_cstr, str.c_str());
@@ -420,8 +416,10 @@ void Git::rename(const std::string &oldname, const std::string &newname)
             if (find_pos != 0)
                 break;
         }
-        for (auto e : new_entry_list)
+        for (auto e : new_entry_list){
             CHECK_ERROR(git_index_add(index.get(), &e));
+            delete e.path;
+        }
     }
 
     commit(index, this->head(), ("rename " + oldname + " to " + newname).c_str());
