@@ -239,6 +239,7 @@ static int sfs_chmod(const char* path, mode_t mode)
 
 static int sfs_rename(const char* oldname, const char* newname)
 {
+    CHECK_READONLY();
     try
     {
         git->rename(std::string(oldname), std::string(newname));
