@@ -71,7 +71,8 @@ static int sfs_open(const char *path, struct fuse_file_info *fi)
             perror("mktemp");
             exit(1);
         }
-        git->dump(path_mangle(path), tmp);
+        bool executable;
+        git->dump(path_mangle(path), tmp, &executable);
         printf("dumped %s\n", tmp);
         OpenContext *ctx = new OpenContext(path_mangle(path), tmp);
         fi->fh = (uint64_t)(void *)ctx;
@@ -83,6 +84,7 @@ static int sfs_open(const char *path, struct fuse_file_info *fi)
             fi->fh = 0;
             return -EIO;
         }
+        ctx->executable = executable;
         return 0;
     }
     catch (const Git::Error &e)
@@ -122,6 +124,7 @@ static int sfs_write(const char *path, const char *buf, size_t size, off_t offse
 static int sfs_truncate(const char *path, off_t length)
 {
     CHECK_READONLY();
+    OpenContext::for_each(path_mangle(path), [=] (OpenContext *ctx) { ctx->truncate(length); });
     try
     {
         git->truncate(path_mangle(path), length);
@@ -169,8 +172,8 @@ static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
             return -EIO;
         }
         ctx->dirty = true;
-        bool executable = (mode & (S_IXUSR | S_IXGRP | S_IXOTH));
-        ctx->commit(*git, "create", executable);
+        ctx->executable = (mode & (S_IXUSR | S_IXGRP | S_IXOTH));
+        ctx->commit(*git, ctx->executable ? "create executable": "create");
         return 0;
     }
     catch (const Git::Error &e)
@@ -238,6 +241,7 @@ static int sfs_chmod(const char* path, mode_t mode)
 {
     CHECK_READONLY();
     bool executable = (mode & (S_IXUSR | S_IXGRP | S_IXOTH));
+    OpenContext::for_each(path_mangle(path), [=] (OpenContext *ctx) { ctx->chmod(executable); });
     try
     {
         git->chmod(path_mangle(path), mode, executable);

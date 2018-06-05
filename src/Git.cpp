@@ -109,12 +109,13 @@ void Git::checkSig() const
     }
 }
 
-void Git::dump(const std::string &path, const std::string &out_path) const
+void Git::dump(const std::string &path, const std::string &out_path, bool *out_executable) const
 {
     // TODO(twd2): cache
     auto e = getEntry(path);
     const git_otype type = git_tree_entry_type(e.get());
     assert(type == GIT_OBJ_BLOB);
+    git_filemode_t mode = git_tree_entry_filemode(e.get());
     git_object *obj_ = nullptr;
     CHECK_ERROR(git_tree_entry_to_object(&obj_, repo, e.get()));
     ObjectPtr obj(obj_);
@@ -124,6 +125,11 @@ void Git::dump(const std::string &path, const std::string &out_path) const
     std::ofstream fout(out_path.c_str());
     fout.write((const char *)data, size);
     fout.close();
+
+    if (out_executable)
+    {
+        *out_executable = mode == GIT_FILEMODE_BLOB_EXECUTABLE;
+    }
 }
 
 void Git::commit(const std::string &in_path, const std::string &path, const char *msg, bool executable)
@@ -343,7 +349,7 @@ void Git::chmod(const std::string &path, const mode_t mode, const bool executabl
 {
     auto e = getEntry(path);
     const git_otype type = git_tree_entry_type(e.get());
-    assert(type == GIT_OBJ_BLOB);
+    if (type != GIT_OBJ_BLOB) return;
     git_object *obj_ = nullptr;
     CHECK_ERROR(git_tree_entry_to_object(&obj_, repo, e.get()));
     ObjectPtr obj(obj_);

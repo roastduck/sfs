@@ -96,7 +96,7 @@ public:
     ~Git();
 
     void checkSig() const;
-    void dump(const std::string &path, const std::string &out_path) const;
+    void dump(const std::string &path, const std::string &out_path, bool *out_executable = nullptr) const;
     void commit(const std::string &in_path, const std::string &path, const char *msg = "commit",
                 bool executable = false);
     void commit_remove(const std::string &path, const char *msg = "commit");

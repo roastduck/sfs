@@ -1,19 +1,28 @@
 #include <cstdio>
+#include <cassert>
+#include <algorithm>
 #include <unistd.h>
 #include "Git.h"
 #include "OpenContext.h"
 
-std::unordered_map<std::string, OpenContext *> OpenContext::openContexts;
+std::unordered_map<std::string, std::vector<OpenContext *> > OpenContext::openContexts;
 
 OpenContext::OpenContext(const std::string &path, const std::string &tmpfile)
     : path(path), tmpfile(tmpfile)
 {
-    openContexts[path] = this;
+    openContexts[path].push_back(this);
 }
 
 OpenContext::~OpenContext()
 {
-    openContexts.erase(path);
+    auto &v = openContexts[path];
+    auto iter = std::find(v.begin(), v.end(), this);
+    assert(iter != v.end());
+    v.erase(iter);
+    if (v.empty())
+    {
+        openContexts.erase(path);
+    }
     if (fd >= 0)
     {
         printf("close %d\n", fd);
@@ -26,11 +35,14 @@ OpenContext::~OpenContext()
     }
 }
 
-void OpenContext::commit(Git &git, const char *msg, bool executable)
+void OpenContext::commit(Git &git, const char *msg)
 {
     if (dirty)
     {
-        git.commit(tmpfile, path, msg, executable);
+        if (path != "")
+        {
+            git.commit(tmpfile, path, msg, executable);
+        }
         dirty = false;
     }
     else
@@ -39,16 +51,46 @@ void OpenContext::commit(Git &git, const char *msg, bool executable)
     }
 }
 
-OpenContext *OpenContext::find(const std::string &path)
+void OpenContext::truncate(std::size_t len)
+{
+    if (ftruncate(fd, len) < 0)
+    {
+        perror("ftruncate");
+    }
+    // dirty = true; // TODO ?
+}
+
+void OpenContext::chmod(bool executable)
+{
+    this->executable = executable;
+    // dirty = true; // TODO ?
+}
+
+void OpenContext::rename(const std::string &newname)
+{
+    path = newname;
+    // dirty = true; // TODO ?
+}
+
+std::vector<OpenContext *> OpenContext::find(const std::string &path)
 {
     auto iter = openContexts.find(path);
     if (iter == openContexts.end())
     {
-        return nullptr;
+        return std::vector<OpenContext *>();
     }
     else
     {
         return iter->second;
+    }
+}
+
+void OpenContext::for_each(const std::string &path, const std::function<void (OpenContext *)> &f)
+{
+    std::vector<OpenContext *> v = find(path);
+    for (OpenContext *ctx : v)
+    {
+        f(ctx);
     }
 }
 
