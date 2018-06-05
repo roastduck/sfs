@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <fuse.h>
+#include "utils.h"
 #include "Git.h"
 #include "OpenContext.h"
 #include "3rd-party/json.hpp"
@@ -35,6 +36,8 @@ static int sfs_readdir(
     off_t offset, struct fuse_file_info *fi
 )
 {
+    UNUSED(offset);
+    UNUSED(fi);
     try
     {
         auto list = git->listDir(path_mangle(path));
@@ -95,6 +98,7 @@ static int sfs_open(const char *path, struct fuse_file_info *fi)
 
 static int sfs_release(const char *path, struct fuse_file_info *fi)
 {
+    UNUSED(path);
     OpenContext *ctx = (OpenContext *)(void *)fi->fh;
     ctx->commit(*git, "close");
     delete ctx;
@@ -103,6 +107,7 @@ static int sfs_release(const char *path, struct fuse_file_info *fi)
 
 static int sfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
+    UNUSED(path);
     OpenContext *ctx = (OpenContext *)(void *)fi->fh;
     int ret;
     if ((ret = lseek(ctx->fd, offset, SEEK_SET)) < 0) return ret;
@@ -111,6 +116,7 @@ static int sfs_read(const char *path, char *buf, size_t size, off_t offset, stru
 
 static int sfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
+    UNUSED(path);
     CHECK_READONLY();
     OpenContext *ctx = (OpenContext *)(void *)fi->fh;
     int ret;
@@ -184,6 +190,7 @@ static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 static int sfs_mkdir(const char *path, mode_t mode)
 {
+    UNUSED(mode);
     CHECK_READONLY();
     try
     {
@@ -227,17 +234,21 @@ static int sfs_rmdir(const char *path)
     }
 }
 
-static int sfs_opendir(const char* path, struct fuse_file_info* f)
+static int sfs_opendir(const char *path, struct fuse_file_info *fi)
 {
+    UNUSED(path);
+    UNUSED(fi);
     return 0;
 }
 
-static int sfs_releasedir(const char* path, struct fuse_file_info* f)
+static int sfs_releasedir(const char *path, struct fuse_file_info *fi)
 {
+    UNUSED(path);
+    UNUSED(fi);
     return 0;
 }
 
-static int sfs_chmod(const char* path, mode_t mode)
+static int sfs_chmod(const char *path, mode_t mode)
 {
     CHECK_READONLY();
     bool executable = (mode & (S_IXUSR | S_IXGRP | S_IXOTH));
@@ -253,7 +264,7 @@ static int sfs_chmod(const char* path, mode_t mode)
     }
 }
 
-static int sfs_rename(const char* oldname, const char* newname)
+static int sfs_rename(const char *oldname, const char *newname)
 {
     CHECK_READONLY();
     try
