@@ -255,7 +255,7 @@ static int sfs_chmod(const char *path, mode_t mode)
     OpenContext::for_each(path_mangle(path), [=] (OpenContext *ctx) { ctx->chmod(executable); });
     try
     {
-        git->chmod(path_mangle(path), mode, executable);
+        git->chmod(path_mangle(path), executable);
         return 0;
     }
     catch (const Git::Error &e)

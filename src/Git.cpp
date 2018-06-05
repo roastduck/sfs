@@ -345,7 +345,7 @@ Git::FileAttr Git::getAttr(const std::string &path) const
     return attr;
 }
 
-void Git::chmod(const std::string &path, const mode_t mode, const bool executable)
+void Git::chmod(const std::string &path, const bool executable)
 {
     auto e = getEntry(path);
     const git_otype type = git_tree_entry_type(e.get());
@@ -353,7 +353,7 @@ void Git::chmod(const std::string &path, const mode_t mode, const bool executabl
     git_object *obj_ = nullptr;
     CHECK_ERROR(git_tree_entry_to_object(&obj_, repo, e.get()));
     ObjectPtr obj(obj_);
-    const git_oid* id = git_blob_id((git_blob*)(obj.get()));
+    const git_oid *id = git_blob_id((git_blob *)(obj.get()));
     commit(*id, path, executable ? "chmod +x" : "chmod -x", executable);
 }
 

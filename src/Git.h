@@ -104,7 +104,7 @@ public:
     void unlink(const std::string &path, const char *msg = "unlink");
     std::vector<FileAttr> listDir(const std::string &path) const;
     FileAttr getAttr(const std::string &path) const;
-    void chmod(const std::string &path, const mode_t mode, const bool executable);
+    void chmod(const std::string &path, const bool executable);
     void rename(const std::string &oldname, const std::string &newname);
 };
 
