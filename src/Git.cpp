@@ -137,7 +137,15 @@ void Git::commit(const std::string &in_path, const std::string &path, const char
     assert(path.length() > 0 && path[0] == '/');
 
     git_oid blob_id;
-    CHECK_ERROR(git_blob_create_fromdisk(&blob_id, repo, in_path.c_str()));
+    if (in_path != "")
+    {
+        CHECK_ERROR(git_blob_create_fromdisk(&blob_id, repo, in_path.c_str()));
+    }
+    else
+    {
+        char c;
+        CHECK_ERROR(git_blob_create_frombuffer(&blob_id, repo, &c, 0));
+    }
     commit(blob_id, path, msg, executable);
 }
 

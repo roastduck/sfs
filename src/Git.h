@@ -43,7 +43,7 @@ public:
         {
             if (_error == GIT_ENOTFOUND) return -ENOENT;
             if (_error == GIT_EEXISTS) return -EEXIST;
-            return -EPERM; // TODO
+            return -EIO; // TODO
         }
     };
 

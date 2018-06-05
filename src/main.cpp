@@ -195,21 +195,7 @@ static int sfs_mkdir(const char *path, mode_t mode)
     try
     {
         std::string gitKeep = path_mangle(path) + "/" + Git::GITKEEP_MAGIC;
-        char tmp[] = "sfstemp.XXXXXX";
-        if (!mktemp(tmp)) // FIXME(tsz): Never use this function.
-        {
-            perror("mktemp");
-            exit(1);
-        }
-        OpenContext ctx(gitKeep, tmp);
-        ctx.fd = open(tmp, O_RDWR | O_CREAT | O_EXCL, 0600);
-        if (ctx.fd < 0)
-        {
-            perror("open");
-            return -EIO;
-        }
-        ctx.dirty = true;
-        ctx.commit(*git, "mkdir");
+        git->commit("", gitKeep, "mkdir");
         return 0;
     }
     catch (const Git::Error &e)
@@ -225,7 +211,8 @@ static int sfs_rmdir(const char *path)
     {
         if (!git->listDir(path_mangle(path)).empty())
             return -ENOTEMPTY;
-        git->unlink(path_mangle(path) + "/" + Git::GITKEEP_MAGIC, "rmdir");
+        std::string gitKeep = path_mangle(path) + "/" + Git::GITKEEP_MAGIC;
+        git->unlink(gitKeep, "rmdir");
         return 0;
     }
     catch (const Git::Error &e)
