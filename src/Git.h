@@ -9,12 +9,33 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <memory>
+#include <pthread.h>
 
 /** Helper for creating smart pointer
  */
 #define BUILD_PTR(ptrName, gitVarName) \
     struct Free##ptrName { void operator()(gitVarName *p) { if (p) gitVarName##_free(p); } }; \
     using ptrName = std::unique_ptr<gitVarName, Free##ptrName>;
+
+class RWlock
+{
+private:
+    pthread_rwlock_t* rwlock;
+public:
+    RWlock(pthread_rwlock_t* p, bool write_lock = 1):rwlock(p)
+    {
+        if (write_lock)
+            pthread_rwlock_wrlock(rwlock);
+        else
+            pthread_rwlock_rdlock(rwlock);
+    }
+    ~RWlock()
+    {
+        printf("before unlock\n");
+        pthread_rwlock_unlock(rwlock);
+        printf("after unlock\n");
+    }
+};
 
 /** Controller of a git repository
  */
@@ -84,9 +105,11 @@ private:
     void commit(const git_oid &blob_id, const std::string &path, const char *msg = "commit",
                 const bool executable = false);
     void commit(const IndexPtr &index, const CommitPtr &head, const char *msg);
+    void commit_remove(const std::string &path, const char *msg = "commit");
 
 public:
     git_repository *repo;
+    pthread_rwlock_t* rwlock;
 
     /** Initialize from a .git directory
      *  @param path : Path to a .git directory
@@ -99,7 +122,6 @@ public:
     void dump(const std::string &path, const std::string &out_path, bool *out_executable = nullptr) const;
     void commit(const std::string &in_path, const std::string &path, const char *msg = "commit",
                 bool executable = false);
-    void commit_remove(const std::string &path, const char *msg = "commit");
     void truncate(const std::string &path, std::size_t size);
     void unlink(const std::string &path, const char *msg = "unlink");
     std::vector<FileAttr> listDir(const std::string &path) const;

@@ -53,6 +53,9 @@ Git::Git(const std::string &path)
         commit(index, nullptr, "Initial commit");
     }
     stat(path.c_str(), &rootStat);
+    rwlock = new(pthread_rwlock_t);
+    pthread_rwlock_init(rwlock, NULL);
+
 }
 
 Git::~Git()
@@ -60,6 +63,8 @@ Git::~Git()
     git_repository_free(repo);
     if (--refCount == 0)
         CHECK_ERROR(git_libgit2_shutdown());
+    pthread_rwlock_destroy(rwlock);
+    delete rwlock;
 }
 
 Git::TreePtr Git::root(const char *spec) const
@@ -90,6 +95,7 @@ Git::TreeEntryPtr Git::getEntry(const std::string &path) const
 void Git::checkSig() const
 {
     git_signature *sig;
+    RWlock mlock(rwlock);
     if (git_signature_default(&sig, repo) < 0)
     {
         std::cerr << std::endl
@@ -111,6 +117,7 @@ void Git::checkSig() const
 
 void Git::dump(const std::string &path, const std::string &out_path, bool *out_executable) const
 {
+    RWlock mlock(rwlock);
     // TODO(twd2): cache
     auto e = getEntry(path);
     const git_otype type = git_tree_entry_type(e.get());
@@ -212,6 +219,7 @@ void Git::commit_remove(const std::string &path, const char *msg)
 
 void Git::truncate(const std::string &path, std::size_t size)
 {
+    RWlock mlock(rwlock);
     assert(path.length() > 0 && path[0] == '/');
     auto e = getEntry(path);
     const git_otype type = git_tree_entry_type(e.get());
@@ -241,6 +249,7 @@ void Git::truncate(const std::string &path, std::size_t size)
 
 void Git::unlink(const std::string &path, const char *msg)
 {
+    RWlock mlock(rwlock);
     assert(path.length() > 0 && path[0] == '/');
     auto e = getEntry(path);
 
@@ -283,7 +292,6 @@ Git::FileAttr Git::getAttr(const git_tree_entry *entry) const
     {
         attr.stat.st_size = 4096;
     }
-
     return attr;
 }
 
@@ -310,6 +318,7 @@ int Git::treeWalkCallback(const char *root, const git_tree_entry *entry, void *_
 
 std::vector<Git::FileAttr> Git::listDir(const std::string &path) const
 {
+    RWlock mlock(rwlock);
     TreePtr root = this->root(), tree = nullptr;
 
     assert(path.length() > 0 && path[0] == '/');
@@ -331,6 +340,7 @@ std::vector<Git::FileAttr> Git::listDir(const std::string &path) const
 
 Git::FileAttr Git::getAttr(const std::string &path) const
 {
+    RWlock mlock(rwlock);
     FileAttr attr;
 
     assert(path.length() > 0 && path[0] == '/');
@@ -347,6 +357,7 @@ Git::FileAttr Git::getAttr(const std::string &path) const
 
 void Git::chmod(const std::string &path, const mode_t mode, const bool executable)
 {
+    RWlock mlock(rwlock);
     auto e = getEntry(path);
     const git_otype type = git_tree_entry_type(e.get());
     if (type != GIT_OBJ_BLOB) return;
@@ -359,6 +370,7 @@ void Git::chmod(const std::string &path, const mode_t mode, const bool executabl
 
 void Git::rename(const std::string &oldname, const std::string &newname)
 {
+    RWlock mlock(rwlock);
     assert(oldname.length() > 0 && oldname[0] == '/');
     assert(newname.length() > 0 && newname[0] == '/');
     auto e = getEntry(oldname);
