@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <fuse.h>
+#include "utils.h"
 #include "Git.h"
 #include "OpenContext.h"
 #include "3rd-party/json.hpp"
@@ -36,6 +37,8 @@ static int sfs_readdir(
     off_t offset, struct fuse_file_info *fi
 )
 {
+    UNUSED(offset);
+    UNUSED(fi);
     try
     {
         auto list = git->listDir(path_mangle(path));
@@ -97,6 +100,7 @@ static int sfs_open(const char *path, struct fuse_file_info *fi)
 static int sfs_release(const char *path, struct fuse_file_info *fi)
 {
     RWlock mlock(rwlock);
+    UNUSED(path);
     OpenContext *ctx = (OpenContext *)(void *)fi->fh;
     ctx->commit(*git, "close");
     delete ctx;
@@ -106,6 +110,7 @@ static int sfs_release(const char *path, struct fuse_file_info *fi)
 static int sfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     RWlock mlock(rwlock);
+    UNUSED(path);
     OpenContext *ctx = (OpenContext *)(void *)fi->fh;
     int ret;
     if ((ret = lseek(ctx->fd, offset, SEEK_SET)) < 0) return ret;
@@ -115,6 +120,7 @@ static int sfs_read(const char *path, char *buf, size_t size, off_t offset, stru
 static int sfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     RWlock mlock(rwlock);
+    UNUSED(path);
     CHECK_READONLY();
     OpenContext *ctx = (OpenContext *)(void *)fi->fh;
     int ret;
@@ -192,27 +198,12 @@ static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 static int sfs_mkdir(const char *path, mode_t mode)
 {
     RWlock mlock(rwlock);
+    UNUSED(mode);
     CHECK_READONLY();
     try
     {
         std::string gitKeep = path_mangle(path) + "/" + Git::GITKEEP_MAGIC;
-        char tmp[] = "sfstemp.XXXXXX";
-        if (!mktemp(tmp)) // FIXME(tsz): Never use this function.
-        {
-            perror("mktemp");
-            exit(1);
-        }
-        OpenContext ctx(gitKeep, tmp);
-        ctx.fd = open(tmp, O_RDWR | O_CREAT | O_EXCL, 0600);
-        if (ctx.fd < 0)
-        {
-            perror("open");
-            return -EIO;
-        }
-        ctx.dirty = true;
-        //pthread_rwlock_wrlock(rwlock);
-        ctx.commit(*git, "mkdir");
-        //pthread_rwlock_unlock(rwlock);
+        git->commit("", gitKeep, "mkdir");
         return 0;
     }
     catch (const Git::Error &e)
@@ -228,7 +219,8 @@ static int sfs_rmdir(const char *path)
     {
         if (!git->listDir(path_mangle(path)).empty())
             return -ENOTEMPTY;
-        git->unlink(path_mangle(path) + "/" + Git::GITKEEP_MAGIC, "rmdir");
+        std::string gitKeep = path_mangle(path) + "/" + Git::GITKEEP_MAGIC;
+        git->unlink(gitKeep, "rmdir");
         return 0;
     }
     catch (const Git::Error &e)
@@ -237,24 +229,28 @@ static int sfs_rmdir(const char *path)
     }
 }
 
-static int sfs_opendir(const char* path, struct fuse_file_info* f)
+static int sfs_opendir(const char *path, struct fuse_file_info *fi)
 {
+    UNUSED(path);
+    UNUSED(fi);
     return 0;
 }
 
-static int sfs_releasedir(const char* path, struct fuse_file_info* f)
+static int sfs_releasedir(const char *path, struct fuse_file_info *fi)
 {
+    UNUSED(path);
+    UNUSED(fi);
     return 0;
 }
 
-static int sfs_chmod(const char* path, mode_t mode)
+static int sfs_chmod(const char *path, mode_t mode)
 {
     CHECK_READONLY();
     bool executable = (mode & (S_IXUSR | S_IXGRP | S_IXOTH));
     OpenContext::for_each(path_mangle(path), [=] (OpenContext *ctx) { ctx->chmod(executable); });
     try
     {
-        git->chmod(path_mangle(path), mode, executable);
+        git->chmod(path_mangle(path), executable);
         return 0;
     }
     catch (const Git::Error &e)
@@ -263,12 +259,17 @@ static int sfs_chmod(const char* path, mode_t mode)
     }
 }
 
-static int sfs_rename(const char* oldname, const char* newname)
+static int sfs_rename(const char *oldname, const char *newname)
 {
     CHECK_READONLY();
     try
     {
-        git->rename(path_mangle(oldname), path_mangle(newname));
+        git->rename(path_mangle(oldname), path_mangle(newname),
+                    [] (const std::string &oldname, const std::string &newname)
+                    {
+                        OpenContext::for_each(oldname, [&] (OpenContext *ctx) { ctx->rename(newname); });
+                        printf("rename %s to %s\n", oldname.c_str(), newname.c_str());
+                    });
         return 0;
     }
     catch (const Git::Error &e)

@@ -32,6 +32,9 @@ public:
 
     static std::vector<OpenContext *> find(const std::string &path);
     static void for_each(const std::string &path, const std::function<void (OpenContext *)> &f);
+
+private:
+    void removeMap();
 };
 
 #endif // OPEN_CONTEXT_H_

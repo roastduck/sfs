@@ -15,14 +15,7 @@ OpenContext::OpenContext(const std::string &path, const std::string &tmpfile)
 
 OpenContext::~OpenContext()
 {
-    auto &v = openContexts[path];
-    auto iter = std::find(v.begin(), v.end(), this);
-    assert(iter != v.end());
-    v.erase(iter);
-    if (v.empty())
-    {
-        openContexts.erase(path);
-    }
+    removeMap();
     if (fd >= 0)
     {
         printf("close %d\n", fd);
@@ -32,6 +25,18 @@ OpenContext::~OpenContext()
     {
         printf("unlink %s\n", tmpfile.c_str());
         unlink(tmpfile.c_str());
+    }
+}
+
+void OpenContext::removeMap()
+{
+    auto &v = openContexts[path];
+    auto iter = std::find(v.begin(), v.end(), this);
+    assert(iter != v.end());
+    v.erase(iter);
+    if (v.empty())
+    {
+        openContexts.erase(path);
     }
 }
 
@@ -68,6 +73,10 @@ void OpenContext::chmod(bool executable)
 
 void OpenContext::rename(const std::string &newname)
 {
+    if (path == newname) return;
+
+    openContexts[newname].push_back(this);
+    removeMap();
     path = newname;
     // dirty = true; // TODO ?
 }

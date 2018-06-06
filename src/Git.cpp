@@ -144,7 +144,15 @@ void Git::commit(const std::string &in_path, const std::string &path, const char
     assert(path.length() > 0 && path[0] == '/');
 
     git_oid blob_id;
-    CHECK_ERROR(git_blob_create_fromdisk(&blob_id, repo, in_path.c_str()));
+    if (in_path != "")
+    {
+        CHECK_ERROR(git_blob_create_fromdisk(&blob_id, repo, in_path.c_str()));
+    }
+    else
+    {
+        char c;
+        CHECK_ERROR(git_blob_create_frombuffer(&blob_id, repo, &c, 0));
+    }
     commit(blob_id, path, msg, executable);
 }
 
@@ -355,7 +363,7 @@ Git::FileAttr Git::getAttr(const std::string &path) const
     return attr;
 }
 
-void Git::chmod(const std::string &path, const mode_t mode, const bool executable)
+void Git::chmod(const std::string &path, const bool executable)
 {
     RWlock mlock(rwlock);
     auto e = getEntry(path);
@@ -364,11 +372,12 @@ void Git::chmod(const std::string &path, const mode_t mode, const bool executabl
     git_object *obj_ = nullptr;
     CHECK_ERROR(git_tree_entry_to_object(&obj_, repo, e.get()));
     ObjectPtr obj(obj_);
-    const git_oid* id = git_blob_id((git_blob*)(obj.get()));
+    const git_oid *id = git_blob_id((git_blob *)(obj.get()));
     commit(*id, path, executable ? "chmod +x" : "chmod -x", executable);
 }
 
-void Git::rename(const std::string &oldname, const std::string &newname)
+void Git::rename(const std::string &oldname, const std::string &newname,
+                 const std::function<void (const std::string &, const std::string &)> &cb)
 {
     RWlock mlock(rwlock);
     assert(oldname.length() > 0 && oldname[0] == '/');
@@ -383,44 +392,44 @@ void Git::rename(const std::string &oldname, const std::string &newname)
     if (type == GIT_OBJ_BLOB)
     {
         CHECK_ERROR(git_index_find_prefix(&pos, index.get(), oldname.c_str() + 1));
-        const git_index_entry* entry = git_index_get_byindex(index.get(), pos);
+        const git_index_entry *entry = git_index_get_byindex(index.get(), pos);
         git_index_entry e;
         memcpy(&e, entry, sizeof(e));
         e.path = newname.c_str() + 1;
         CHECK_ERROR(git_index_add(index.get(), &e));
         CHECK_ERROR(git_index_remove_bypath(index.get(), entry->path));
+        cb(oldname, newname);
     }
     else // type == GIT_OBJ_TREE
     {
         std::vector<git_index_entry> new_entry_list;
-        new_entry_list.clear();
-        std::string str;
-        std::string _oldname = std::string(oldname.c_str() + 1) + '/';
-        std::string _newname = std::string(newname.c_str() + 1) + '/';
-        CHECK_ERROR(git_index_find_prefix(&pos, index.get(), _oldname.c_str()));
-        const git_index_entry* entry = git_index_get_byindex(index.get(), pos);
-        str = std::string(entry->path);
-        size_t find_pos = str.find(_oldname);
-        while (1)
+        std::string oldpath = oldname.substr(1) + '/';
+        std::string newpath = newname.substr(1) + '/';
+        CHECK_ERROR(git_index_find_prefix(&pos, index.get(), oldpath.c_str()));
+        const git_index_entry *entry = git_index_get_byindex(index.get(), pos);
+        std::string filename = entry->path;
+        size_t find_pos = filename.find(oldpath);
+        while (find_pos == 0)
         {
-            git_index_entry e;
-            memcpy(&e, entry, sizeof(e));
-            str = str.replace(find_pos, _oldname.length(), _newname);
-            char* tmp_cstr = new char[str.length() + 1];
-            strcpy(tmp_cstr, str.c_str());
+            git_index_entry e = *entry;
+            std::string new_filename = filename;
+            new_filename.replace(find_pos, oldpath.length(), newpath);
+            char *tmp_cstr = new char[new_filename.length() + 1];
+            strcpy(tmp_cstr, new_filename.c_str());
             e.path = tmp_cstr;
             new_entry_list.push_back(e);
             CHECK_ERROR(git_index_remove_bypath(index.get(), entry->path));
-            git_index_entry tmpe = new_entry_list.back();
-            
-            //next entry
+            // FIXME(twd2): If an exception occurs, previously removed paths could not
+            //              be added into index in the following for-loop. Thus, they
+            //              would be missing.
+            cb("/" + filename, "/" + new_filename);
+
+            // next entry
             entry = git_index_get_byindex(index.get(), pos);
-            str = std::string(entry->path);
-            find_pos = str.find(_oldname);
-            if (find_pos != 0)
-                break;
+            filename = entry->path;
+            find_pos = filename.find(oldpath);
         }
-        for (auto e : new_entry_list){
+        for (auto &e : new_entry_list) {
             CHECK_ERROR(git_index_add(index.get(), &e));
             delete e.path;
         }

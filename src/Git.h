@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <memory>
 #include <pthread.h>
+#include <functional>
 
 /** Helper for creating smart pointer
  */
@@ -64,7 +65,7 @@ public:
         {
             if (_error == GIT_ENOTFOUND) return -ENOENT;
             if (_error == GIT_EEXISTS) return -EEXIST;
-            return -EPERM; // TODO
+            return -EIO; // TODO
         }
     };
 
@@ -126,8 +127,9 @@ public:
     void unlink(const std::string &path, const char *msg = "unlink");
     std::vector<FileAttr> listDir(const std::string &path) const;
     FileAttr getAttr(const std::string &path) const;
-    void chmod(const std::string &path, const mode_t mode, const bool executable);
-    void rename(const std::string &oldname, const std::string &newname);
+    void chmod(const std::string &path, const bool executable);
+    void rename(const std::string &oldname, const std::string &newname,
+                const std::function<void (const std::string &, const std::string &)> &cb);
 };
 
 #undef BUILD_PTR
