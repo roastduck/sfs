@@ -256,7 +256,12 @@ static int sfs_rename(const char *oldname, const char *newname)
     CHECK_READONLY();
     try
     {
-        git->rename(path_mangle(oldname), path_mangle(newname));
+        git->rename(path_mangle(oldname), path_mangle(newname),
+                    [] (const std::string &oldname, const std::string &newname)
+                    {
+                        OpenContext::for_each(oldname, [&] (OpenContext *ctx) { ctx->rename(newname); });
+                        printf("rename %s to %s\n", oldname.c_str(), newname.c_str());
+                    });
         return 0;
     }
     catch (const Git::Error &e)

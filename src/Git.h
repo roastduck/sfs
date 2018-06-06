@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <memory>
+#include <functional>
 
 /** Helper for creating smart pointer
  */
@@ -105,7 +106,8 @@ public:
     std::vector<FileAttr> listDir(const std::string &path) const;
     FileAttr getAttr(const std::string &path) const;
     void chmod(const std::string &path, const bool executable);
-    void rename(const std::string &oldname, const std::string &newname);
+    void rename(const std::string &oldname, const std::string &newname,
+                const std::function<void (const std::string &, const std::string &)> &cb);
 };
 
 #undef BUILD_PTR
