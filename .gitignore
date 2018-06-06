@@ -13,3 +13,7 @@
 
 # Binary
 /bin
+
+# FIO
+/sfstemp.*
+/local-job*
