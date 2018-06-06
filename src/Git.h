@@ -18,22 +18,24 @@
     struct Free##ptrName { void operator()(gitVarName *p) { if (p) gitVarName##_free(p); } }; \
     using ptrName = std::unique_ptr<gitVarName, Free##ptrName>;
 
+// TODO(twd2): move out
 class RWlock
 {
 private:
-    pthread_rwlock_t* rwlock;
+    pthread_rwlock_t &rwlock;
 public:
-    RWlock(pthread_rwlock_t* p, bool write_lock = 1):rwlock(p)
+    RWlock(pthread_rwlock_t &l, bool write_lock = 1) : rwlock(l)
     {
         if (write_lock)
-            pthread_rwlock_wrlock(rwlock);
+            pthread_rwlock_wrlock(&rwlock);
         else
-            pthread_rwlock_rdlock(rwlock);
+            pthread_rwlock_rdlock(&rwlock);
     }
+
     ~RWlock()
     {
         printf("before unlock\n");
-        pthread_rwlock_unlock(rwlock);
+        pthread_rwlock_unlock(&rwlock);
         printf("after unlock\n");
     }
 };
@@ -110,7 +112,7 @@ private:
 
 public:
     git_repository *repo;
-    pthread_rwlock_t* rwlock;
+    mutable pthread_rwlock_t rwlock;
 
     /** Initialize from a .git directory
      *  @param path : Path to a .git directory

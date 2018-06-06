@@ -12,7 +12,6 @@
 
 using Json = nlohmann::json;
 
-pthread_rwlock_t* rwlock;
 Json config;
 Git *git;
 bool commit_on_write = false, read_only = false;
@@ -99,7 +98,7 @@ static int sfs_open(const char *path, struct fuse_file_info *fi)
 
 static int sfs_release(const char *path, struct fuse_file_info *fi)
 {
-    RWlock mlock(rwlock);
+    RWlock mlock(git->rwlock);
     UNUSED(path);
     OpenContext *ctx = (OpenContext *)(void *)fi->fh;
     ctx->commit(*git, "close");
@@ -109,7 +108,7 @@ static int sfs_release(const char *path, struct fuse_file_info *fi)
 
 static int sfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-    RWlock mlock(rwlock);
+    RWlock mlock(git->rwlock);
     UNUSED(path);
     OpenContext *ctx = (OpenContext *)(void *)fi->fh;
     int ret;
@@ -119,7 +118,7 @@ static int sfs_read(const char *path, char *buf, size_t size, off_t offset, stru
 
 static int sfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-    RWlock mlock(rwlock);
+    RWlock mlock(git->rwlock);
     UNUSED(path);
     CHECK_READONLY();
     OpenContext *ctx = (OpenContext *)(void *)fi->fh;
@@ -162,7 +161,7 @@ static int sfs_unlink(const char *path)
 
 static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-    RWlock mlock(rwlock);
+    RWlock mlock(git->rwlock);
     CHECK_READONLY();
     try
     {
@@ -197,7 +196,7 @@ static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 static int sfs_mkdir(const char *path, mode_t mode)
 {
-    RWlock mlock(rwlock);
+    RWlock mlock(git->rwlock);
     UNUSED(mode);
     CHECK_READONLY();
     try
@@ -299,7 +298,6 @@ int main(int argc, char **argv)
 
     git = new Git(config["git_path"].get<std::string>()); // Will not be deleted
     git->checkSig();
-    rwlock = git->rwlock;
 
     std::vector<std::string> fuseArgs = config["fuse_args"];
     fuseArgs.insert(fuseArgs.begin(), argv[0]);

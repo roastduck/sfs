@@ -53,9 +53,7 @@ Git::Git(const std::string &path)
         commit(index, nullptr, "Initial commit");
     }
     stat(path.c_str(), &rootStat);
-    rwlock = new(pthread_rwlock_t);
-    pthread_rwlock_init(rwlock, NULL);
-
+    pthread_rwlock_init(&rwlock, nullptr);
 }
 
 Git::~Git()
@@ -63,8 +61,7 @@ Git::~Git()
     git_repository_free(repo);
     if (--refCount == 0)
         CHECK_ERROR(git_libgit2_shutdown());
-    pthread_rwlock_destroy(rwlock);
-    delete rwlock;
+    pthread_rwlock_destroy(&rwlock);
 }
 
 Git::TreePtr Git::root(const char *spec) const
