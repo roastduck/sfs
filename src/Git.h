@@ -34,9 +34,7 @@ public:
 
     ~RWlock()
     {
-        printf("before unlock\n");
         pthread_rwlock_unlock(&rwlock);
-        printf("after unlock\n");
     }
 };
 

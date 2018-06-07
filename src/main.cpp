@@ -108,8 +108,8 @@ static int sfs_release(const char *path, struct fuse_file_info *fi)
 
 static int sfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-    RWlock mlock(git->rwlock);
     UNUSED(path);
+    RWlock mlock(git->rwlock, false);
     OpenContext *ctx = (OpenContext *)(void *)fi->fh;
     int ret;
     if ((ret = lseek(ctx->fd, offset, SEEK_SET)) < 0) return ret;
@@ -161,7 +161,6 @@ static int sfs_unlink(const char *path)
 
 static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-    RWlock mlock(git->rwlock);
     CHECK_READONLY();
     try
     {
@@ -183,9 +182,10 @@ static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
         }
         ctx->dirty = true;
         ctx->executable = (mode & (S_IXUSR | S_IXGRP | S_IXOTH));
-        //pthread_rwlock_wrlock(rwlock);
-        ctx->commit(*git, ctx->executable ? "create executable": "create");
-        //pthread_rwlock_unlock(rwlock);
+        {
+            RWlock mlock(git->rwlock);
+            ctx->commit(*git, ctx->executable ? "create executable": "create");
+        }
         return 0;
     }
     catch (const Git::Error &e)
@@ -196,13 +196,15 @@ static int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 static int sfs_mkdir(const char *path, mode_t mode)
 {
-    RWlock mlock(git->rwlock);
     UNUSED(mode);
     CHECK_READONLY();
     try
     {
         std::string gitKeep = path_mangle(path) + "/" + Git::GITKEEP_MAGIC;
-        git->commit("", gitKeep, "mkdir");
+        {
+            RWlock mlock(git->rwlock);
+            git->commit("", gitKeep, "mkdir");
+        }
         return 0;
     }
     catch (const Git::Error &e)

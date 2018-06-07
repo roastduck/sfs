@@ -92,7 +92,6 @@ Git::TreeEntryPtr Git::getEntry(const std::string &path) const
 void Git::checkSig() const
 {
     git_signature *sig;
-    RWlock mlock(rwlock);
     if (git_signature_default(&sig, repo) < 0)
     {
         std::cerr << std::endl
@@ -114,7 +113,7 @@ void Git::checkSig() const
 
 void Git::dump(const std::string &path, const std::string &out_path, bool *out_executable) const
 {
-    RWlock mlock(rwlock);
+    RWlock mlock(rwlock, false);
     // TODO(twd2): cache
     auto e = getEntry(path);
     const git_otype type = git_tree_entry_type(e.get());
@@ -323,7 +322,7 @@ int Git::treeWalkCallback(const char *root, const git_tree_entry *entry, void *_
 
 std::vector<Git::FileAttr> Git::listDir(const std::string &path) const
 {
-    RWlock mlock(rwlock);
+    
     TreePtr root = this->root(), tree = nullptr;
 
     assert(path.length() > 0 && path[0] == '/');
@@ -331,6 +330,7 @@ std::vector<Git::FileAttr> Git::listDir(const std::string &path) const
         tree = std::move(root);
     else {
         git_tree *tree_ = NULL;
+        RWlock mlock(rwlock, false);
         auto e = getEntry(path);
         assert(git_tree_entry_type(e.get()) == GIT_OBJ_TREE);
         CHECK_ERROR(git_tree_lookup(&tree_, repo, git_tree_entry_id(e.get())));
@@ -345,7 +345,7 @@ std::vector<Git::FileAttr> Git::listDir(const std::string &path) const
 
 Git::FileAttr Git::getAttr(const std::string &path) const
 {
-    RWlock mlock(rwlock);
+    RWlock mlock(rwlock, false);
     FileAttr attr;
 
     assert(path.length() > 0 && path[0] == '/');
