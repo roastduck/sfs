@@ -263,7 +263,7 @@ void Git::unlink(const std::string &path, const char *msg)
     FileAttr attr = getAttr(e.get());
     if (attr.stat.st_nlink == 1)
     {
-        // TODO: close file or dir
+        // TODO: close file
         // TODO(twd2): what's this???
     }
 

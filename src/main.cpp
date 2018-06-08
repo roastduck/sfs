@@ -19,16 +19,34 @@ bool commit_on_write = false, read_only = false;
 #define CHECK_READONLY() \
     do { if (read_only) return -EROFS; } while (0)
 
+#define path_mangle_prefix_len 6
+const std::string  path_mangle_prefix="sxgit_";
+
 std::string path_mangle(const std::string &path)
 {
-    // TODO(ltl)
-    return path;
+    std::string newpath="";
+    int length=path.length();
+    for (int i = 0; i < length ;i++)
+    {
+        newpath+=path[i];
+        if (path[i] == '/')
+        {
+            newpath+=path_mangle_prefix; 
+        }            
+    }         
+    return newpath;
 }
 
 std::string path_demangle(const std::string &path)
 {
-    // TODO(ltl)
-    return path;
+    std::string newpath="";
+    int length=path.length();
+    for (int i = 0; i < length ;i++)
+    {
+        newpath+=path[i];
+        if (path[i] == '/')  i += path_mangle_prefix_len;           
+    }         
+    return newpath;
 }
 
 static int sfs_readdir(
