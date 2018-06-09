@@ -72,6 +72,55 @@ Git::TreePtr Git::root(const char *spec) const
     return TreePtr(root);
 }
 
+void Git::checkout_branch(time_t timeoff)
+{
+    const std::string branch_name_prefix="sfsbranch_";
+    git_branch_iterator* branch_iterator = nullptr;
+    git_reference* tmp_branch = nullptr;
+    git_branch_t branch_type;
+    git_reference* new_branch = nullptr;
+    const git_oid* commit_id = nullptr;
+    git_commit* last_commit = nullptr;
+    int branch_num=0;
+    time_t mintime=0x7fffffff;
+    const git_oid* mintime_commit_id = nullptr;
+    git_reference* head = nullptr;
+        
+    CHECK_ERROR(git_branch_iterator_new(&branch_iterator, repo, GIT_BRANCH_LOCAL));
+    CHECK_ERROR(git_repository_head(&head, repo));
+    const git_oid* head_commit_id= git_reference_target(head);
+
+    while (GIT_ITEROVER != git_branch_next(&tmp_branch, &branch_type, branch_iterator))
+    {
+	    branch_num++;
+	    commit_id =git_reference_target(tmp_branch);
+        const char* branch_name;
+        git_branch_name(&branch_name, tmp_branch);
+        do{
+		    CHECK_ERROR(git_commit_lookup(&last_commit, repo, commit_id));
+            unsigned int parentcount=git_commit_parentcount(last_commit);
+		    if (parentcount ==0) break;
+		    assert(parentcount==1);		
+		    time_t commit_time=git_commit_time(last_commit);
+		    if (commit_time<=timeoff && (timeoff-commit_time<mintime || (timeoff-commit_time==mintime && !git_oid_cmp(head_commit_id,commit_id))))
+		    {
+		    	mintime=timeoff-commit_time;
+		    	mintime_commit_id=commit_id;
+                break;
+		    }
+		    commit_id=git_commit_parent_id(last_commit,parentcount-1);
+	    	git_commit_free(last_commit);
+	    }while(commit_id!=NULL);
+	    git_reference_free(tmp_branch);
+    }
+    git_branch_iterator_free(branch_iterator);
+    if (mintime_commit_id == NULL) return;
+    if (!git_oid_cmp(head_commit_id,mintime_commit_id)) return;
+    CHECK_ERROR(git_commit_lookup(&last_commit, repo, mintime_commit_id));  
+    CHECK_ERROR(git_branch_create(&new_branch, repo, (branch_name_prefix+std::to_string(branch_num)).c_str(), last_commit, 0));
+    git_commit_free(last_commit);
+    git_repository_set_head(repo, git_reference_name(new_branch));
+}
 Git::CommitPtr Git::head(const char *spec) const
 {
     git_object *obj = nullptr;

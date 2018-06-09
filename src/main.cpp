@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <fuse.h>
+#include <time.h>
 #include "utils.h"
 #include "Git.h"
 #include "OpenContext.h"
@@ -15,12 +16,12 @@ using Json = nlohmann::json;
 Json config;
 Git *git;
 bool commit_on_write = false, read_only = false;
-
 #define CHECK_READONLY() \
     do { if (read_only) return -EROFS; } while (0)
 
 #define path_mangle_prefix_len 6
 const std::string  path_mangle_prefix="sxgit_";
+const char *time_format_str="%d-%d-%d %d:%d:%d";
 
 std::string path_mangle(const std::string &path)
 {
@@ -51,6 +52,20 @@ std::string path_demangle(const std::string &path)
     return newpath;
 }
 
+time_t string2time(const std::string &str)  
+{  
+  struct tm tm1;  
+  int year,mon,mday,hour,min,sec;  
+  if( -1 == sscanf(str.c_str(),time_format_str,&year,&mon,&mday,&hour,&min,&sec)) return -1;  
+  tm1.tm_year=year-1900;  
+  tm1.tm_mon=mon-1;  
+  tm1.tm_mday=mday;  
+  tm1.tm_hour=hour;  
+  tm1.tm_min=min;  
+  tm1.tm_sec=sec;  
+  return mktime(&tm1);  
+} 
+
 static int sfs_readdir(
     const char *path, void *buf, fuse_fill_dir_t filler,
     off_t offset, struct fuse_file_info *fi
@@ -76,7 +91,6 @@ static int sfs_getattr(const char *path, struct stat *st)
     try
     {
         *st = git->getAttr(path_mangle(path)).stat;
-        //st->
         return 0;
     }
     catch (const Git::Error &e)
@@ -318,10 +332,11 @@ int main(int argc, char **argv)
 
     commit_on_write = config["commit_on_write"].get<bool>();
     read_only = config["read_only"].get<bool>();
-
+    bool version_selection=config["version_selection"].get<bool>();
     git = new Git(config["git_path"].get<std::string>()); // Will not be deleted
     git->checkSig();
-
+    if (version_selection)
+        git->checkout_branch(string2time(config["version_time"].get<std::string>()));
     std::vector<std::string> fuseArgs = config["fuse_args"];
     fuseArgs.insert(fuseArgs.begin(), argv[0]);
     const int fuseArgc = fuseArgs.size();

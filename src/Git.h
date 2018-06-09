@@ -132,6 +132,7 @@ public:
     void chmod(const std::string &path, const bool executable);
     void rename(const std::string &oldname, const std::string &newname,
                 const std::function<void (const std::string &, const std::string &)> &cb);
+    void checkout_branch(time_t timeoff);
 };
 
 #undef BUILD_PTR
