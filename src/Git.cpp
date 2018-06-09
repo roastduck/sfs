@@ -270,18 +270,6 @@ void Git::unlink(const std::string &path, const char *msg)
     commit_remove(path, msg);
 }
 
-std::string Git::remove_path_mangle_prefix(const std::string &path) const
-{
-    if (path == GITKEEP_MAGIC) return path;
-    if (path.length()<=1) return path;
-    std::string newpath="";
-    int length=path.length();
-    for (int i = path_mangle_prefix_len; i < length ;i++)
-    {
-        newpath+=path[i];          
-    }      
-    return newpath;
-}
 Git::FileAttr Git::getAttr(const git_tree_entry *entry) const
 {
     FileAttr attr;
@@ -291,8 +279,7 @@ Git::FileAttr Git::getAttr(const git_tree_entry *entry) const
     bool isDir = (type == GIT_OBJ_TREE);
     git_filemode_t mode = git_tree_entry_filemode(entry);
 
-    attr.name = remove_path_mangle_prefix(git_tree_entry_name(entry));
-
+    attr.name = git_tree_entry_name(entry);
     attr.stat.st_mode = mode | (isDir ? (S_IFDIR | 0755) : S_IFREG);
     attr.stat.st_uid = rootStat.st_uid;
     attr.stat.st_gid = rootStat.st_gid;
@@ -335,6 +322,7 @@ int Git::treeWalkCallback(const char *root, const git_tree_entry *entry, void *_
 
 std::vector<Git::FileAttr> Git::listDir(const std::string &path) const
 {
+    
     TreePtr root = this->root(), tree = nullptr;
 
     assert(path.length() > 0 && path[0] == '/');
