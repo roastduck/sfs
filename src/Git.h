@@ -18,6 +18,8 @@
     struct Free##ptrName { void operator()(gitVarName *p) { if (p) gitVarName##_free(p); } }; \
     using ptrName = std::unique_ptr<gitVarName, Free##ptrName>;
 
+#define path_mangle_prefix_len 6
+
 // TODO(twd2): move out
 class RWlock
 {
@@ -92,7 +94,7 @@ private:
     TreeEntryPtr getEntry(const std::string &path) const;
 
     FileAttr getAttr(const git_tree_entry *entry) const;
-
+    std::string remove_path_mangle_prefix(const std::string &path)const;
     struct stat rootStat; /// Attributes of .git
 
     static int refCount; /// Reference count of Git objects

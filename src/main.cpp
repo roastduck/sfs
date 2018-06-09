@@ -24,6 +24,7 @@ const std::string  path_mangle_prefix="sxgit_";
 
 std::string path_mangle(const std::string &path)
 {
+    if (path.length()<=1) return path;
     std::string newpath="";
     int length=path.length();
     for (int i = 0; i < length ;i++)
@@ -39,6 +40,7 @@ std::string path_mangle(const std::string &path)
 
 std::string path_demangle(const std::string &path)
 {
+    if (path.length()<=1) return path;
     std::string newpath="";
     int length=path.length();
     for (int i = 0; i < length ;i++)
@@ -74,6 +76,7 @@ static int sfs_getattr(const char *path, struct stat *st)
     try
     {
         *st = git->getAttr(path_mangle(path)).stat;
+        //st->
         return 0;
     }
     catch (const Git::Error &e)
