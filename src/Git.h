@@ -43,8 +43,6 @@ public:
 class Git
 {
 public:
-    static constexpr const char *GITKEEP_MAGIC = "....gitkeep....";
-
     /** Git will throw this exception once `error < 0`
      */
     class Error : public std::runtime_error

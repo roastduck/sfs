@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <fuse.h>
 #include "utils.h"
 #include "Git.h"
@@ -19,34 +20,80 @@ bool commit_on_write = false, read_only = false;
 #define CHECK_READONLY() \
     do { if (read_only) return -EROFS; } while (0)
 
-#define path_mangle_prefix_len 6
-const std::string  path_mangle_prefix="sxgit_";
+static constexpr const char *GITKEEP_MAGIC = ".gitkeep";
+const std::string path_mangle_prefix = "$";
+const std::size_t path_mangle_len = path_mangle_prefix.length();
+
+// TODO(twd2): performance improvement
 
 std::string path_mangle(const std::string &path)
 {
-    std::string newpath="";
-    int length=path.length();
-    for (int i = 0; i < length ;i++)
+    std::stringstream newpath;
+    std::size_t len = path.length();
+    std::stringstream part_stream;
+    for (std::size_t i = 0; i <= len; i++)
     {
-        newpath+=path[i];
-        if (path[i] == '/')
+        if (i == len || path[i] == '/')
         {
-            newpath+=path_mangle_prefix; 
-        }            
-    }         
-    return newpath;
+            std::string part = part_stream.str();
+            part_stream.str("");
+            if (part == "" || part == "." || part == "..")
+            {
+                newpath << part;
+            }
+            else
+            {
+                newpath << path_mangle_prefix << part;
+            }
+            if (i < len)
+            {
+                newpath.put('/');
+            }
+        }
+        else
+        {
+            part_stream.put(path[i]);
+        }
+    }
+    return newpath.str();
 }
 
 std::string path_demangle(const std::string &path)
 {
-    std::string newpath="";
-    int length=path.length();
-    for (int i = 0; i < length ;i++)
+    std::stringstream newpath;
+    std::size_t len = path.length();
+    std::stringstream part_stream;
+    for (std::size_t i = 0; i <= len; i++)
     {
-        newpath+=path[i];
-        if (path[i] == '/')  i += path_mangle_prefix_len;           
-    }         
-    return newpath;
+        if (i == len || path[i] == '/')
+        {
+            std::string part = part_stream.str();
+            std::size_t part_len = part.length();
+            part_stream.str("");
+            if (part == "" || part == "." || part == "..")
+            {
+                newpath << part;
+            }
+            else if (part_len <= path_mangle_len ||
+                     part.substr(0, path_mangle_len) != path_mangle_prefix)
+            {
+                return "";
+            }
+            else
+            {
+                newpath << part.substr(path_mangle_len);
+            }
+            if (i < len)
+            {
+                newpath.put('/');
+            }
+        }
+        else
+        {
+            part_stream.put(path[i]);
+        }
+    }
+    return newpath.str();
 }
 
 static int sfs_readdir(
@@ -60,7 +107,13 @@ static int sfs_readdir(
     {
         auto list = git->listDir(path_mangle(path));
         for (const auto &item : list)
-            filler(buf, path_demangle(item.name).c_str(), &item.stat, 0 /* Offset disabled */);
+        {
+            std::string p = path_demangle(item.name);
+            if (p != "")
+            {
+                filler(buf, p.c_str(), &item.stat, 0 /* Offset disabled */);
+            }
+        }
         return 0;
     }
     catch (const Git::Error &e)
@@ -218,7 +271,7 @@ static int sfs_mkdir(const char *path, mode_t mode)
     CHECK_READONLY();
     try
     {
-        std::string gitKeep = path_mangle(path) + "/" + Git::GITKEEP_MAGIC;
+        std::string gitKeep = path_mangle(path) + "/" + GITKEEP_MAGIC;
         {
             RWlock mlock(git->rwlock);
             git->commit("", gitKeep, "mkdir");
@@ -238,7 +291,7 @@ static int sfs_rmdir(const char *path)
     {
         if (!git->listDir(path_mangle(path)).empty())
             return -ENOTEMPTY;
-        std::string gitKeep = path_mangle(path) + "/" + Git::GITKEEP_MAGIC;
+        std::string gitKeep = path_mangle(path) + "/" + GITKEEP_MAGIC;
         git->unlink(gitKeep, "rmdir");
         return 0;
     }
@@ -300,8 +353,34 @@ static int sfs_rename(const char *oldname, const char *newname)
 static struct fuse_operations sfs_ops;
 // CAUTIOUS: If you put `sfs_ops` in the stack, all the things will go wrong!
 
+void test_mangle()
+{
+    // embedded tests
+    assert(path_mangle("/path/to/.git") == "/$path/$to/$.git");
+    assert(path_mangle("/") == "/");
+    assert(path_mangle("///123") == "///$123");
+    assert(path_mangle("file") == "$file");
+    assert(path_mangle("/./a") == "/./$a");
+    assert(path_mangle("/../a") == "/../$a");
+    assert(path_mangle("/.../a") == "/$.../$a");
+    assert(path_demangle("/$path/$to/$.git") == "/path/to/.git");
+    assert(path_demangle("/") == "/");
+    assert(path_demangle("///$123") == "///123");
+    assert(path_demangle("$file") == "file");
+    assert(path_demangle("/./$a") == "/./a");
+    assert(path_demangle("/../$a") == "/../a");
+    assert(path_demangle("/$.../$a") == "/.../a");
+    assert(path_demangle("/$path/file") == "");
+    assert(path_demangle("") == "");
+    assert(path_demangle("/path/file") == "");
+    assert(path_demangle("$///") == "");
+    assert(path_demangle("$123///") == "123///");
+}
+
 int main(int argc, char **argv)
 {
+    test_mangle();
+
     if (argc != 2)
     {
         std::cerr << "Usage: " << argv[0] << " <config_file>" << std::endl;
