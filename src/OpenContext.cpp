@@ -103,3 +103,8 @@ void OpenContext::for_each(const std::string &path, const std::function<void (Op
     }
 }
 
+std::unordered_map<std::string, std::vector<OpenContext *> > &OpenContext::contexts()
+{
+    return openContexts;
+}
+

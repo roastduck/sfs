@@ -20,6 +20,7 @@ public:
     int fd = -1;
     bool dirty = false;
     bool executable = false;
+    bool commit_on_next_write = false;
 
     explicit OpenContext(const std::string &path, const std::string &tmpfile);
 
@@ -32,6 +33,7 @@ public:
 
     static std::vector<OpenContext *> find(const std::string &path);
     static void for_each(const std::string &path, const std::function<void (OpenContext *)> &f);
+    static std::unordered_map<std::string, std::vector<OpenContext *> > &contexts(); // TODO(twd2): const?
 
 private:
     void removeMap();
