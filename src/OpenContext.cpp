@@ -20,7 +20,7 @@ OpenContext::~OpenContext()
     removeMap();
     if (fd >= 0)
     {
-        LOG << "close fd" << std::endl;
+        LOG << "close " << fd << std::endl;
         close(fd);
     }
     if (tmpfile != "")
