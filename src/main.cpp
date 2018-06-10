@@ -5,7 +5,6 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#include <thread>
 #include <fuse.h>
 #include <time.h>
 #include "utils.h"
@@ -21,8 +20,6 @@ Git *git;
 bool commit_on_write = false, read_only = false;
 int commit_interval = -1;
 const char *time_format_str="%d-%d-%d %d:%d:%d";
-
-std::thread timer_thread;
 
 static constexpr const char *GITKEEP_MAGIC = ".gitkeep";
 const std::string path_mangle_prefix = "$";
@@ -100,19 +97,19 @@ std::string path_demangle(const std::string &path)
     return newpath.str();
 }
 
-time_t string2time(const std::string &str)  
-{  
-  struct tm tm1;  
-  int year,mon,mday,hour,min,sec;  
-  if( -1 == sscanf(str.c_str(),time_format_str,&year,&mon,&mday,&hour,&min,&sec)) return -1;  
-  tm1.tm_year=year-1900;  
-  tm1.tm_mon=mon-1;  
-  tm1.tm_mday=mday;  
-  tm1.tm_hour=hour;  
-  tm1.tm_min=min;  
-  tm1.tm_sec=sec;  
-  return mktime(&tm1);  
-} 
+time_t string2time(const std::string &str)
+{
+    struct tm tm1;
+    int year,mon,mday,hour,min,sec;
+    if( -1 == sscanf(str.c_str(),time_format_str,&year,&mon,&mday,&hour,&min,&sec)) return -1;
+    tm1.tm_year=year-1900;
+    tm1.tm_mon=mon-1;
+    tm1.tm_mday=mday;
+    tm1.tm_hour=hour;
+    tm1.tm_min=min;
+    tm1.tm_sec=sec;
+    return mktime(&tm1);
+}
 
 #define CHECK_READONLY() \
     do { if (read_only) return -EROFS; } while (0)
@@ -432,7 +429,7 @@ int main(int argc, char **argv)
     for (int i = 0; i < fuseArgc; i++)
         fuseArgv[i] = const_cast<char*>(fuseArgs[i].c_str()); // I bet FUSE won't change it
 
-    timer_thread = std::thread(timer_loop, commit_interval);
+    Timer::start(commit_interval);
 
     // Named struct initializaion is only supported in plain C
     // So we are using assignments here
@@ -451,10 +448,6 @@ int main(int argc, char **argv)
     sfs_ops.releasedir = sfs_releasedir;
     sfs_ops.chmod = sfs_chmod;
     sfs_ops.rename = sfs_rename;
-    int ret = fuse_main(fuseArgc, fuseArgv, &sfs_ops, NULL);
-    is_running = false;
-    // TODO(twd2): fence?
-    timer_thread.join();
-    return ret;
+    return fuse_main(fuseArgc, fuseArgv, &sfs_ops, NULL);
 }
 

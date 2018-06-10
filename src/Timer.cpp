@@ -4,13 +4,13 @@
 #include "Timer.h"
 #include "OpenContext.h"
 
-bool is_running = true;
+std::thread Timer::timer_thread;
 
-void timer_loop(int interval)
+void Timer::timer_loop(int interval)
 {
     if (interval <= 0) return;
 
-    while (is_running)
+    while (true)
     {
         printf("Timed out, setting commit flags...\n");
         for (auto &p : OpenContext::contexts())
@@ -23,10 +23,13 @@ void timer_loop(int interval)
             }
         }
 
-        // FIXME(twd2)!
-        for (int i = 0; is_running && i < interval; ++i)
-        {
-            sleep(1);
-        }
+        sleep(interval);
     }
 }
+
+void Timer::start(int commit_interval)
+{
+    timer_thread = std::thread(timer_loop, commit_interval);
+    timer_thread.detach();
+}
+
