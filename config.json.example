@@ -2,6 +2,7 @@
     "git_path": "/path/to/.git",
     "read_only": false,
     "fuse_args": ["-d", "/path/to/your/mounting/point"],
+    "log_file": "path/to/log_file (leave empty or not setting this field to use stdout)",
     "commit_on_write": false,
     "version_selection":false,
     "version_time":"2100-07-04 00:00:00",
