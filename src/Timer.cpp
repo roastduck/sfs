@@ -2,6 +2,7 @@
 #include <cassert>
 #include <unistd.h>
 #include "Timer.h"
+#include "utils.h"
 #include "OpenContext.h"
 
 std::thread Timer::timer_thread;
@@ -12,14 +13,14 @@ void Timer::timer_loop(int interval)
 
     while (true)
     {
-        printf("Timed out, setting commit flags...\n");
+        LOG << "Timed out, setting commit flags..." << std::endl;
         OpenContext::openContextsLock.lock();
         for (auto &p : OpenContext::contexts())
         {
             for (OpenContext *ctx : p.second)
             {
                 ctx->commit_on_next_write = true;
-                printf("Find a context.\n");
+                LOG << "Find a context." << std::endl;
             }
         }
         OpenContext::openContextsLock.unlock();

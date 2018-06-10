@@ -7,10 +7,10 @@
 #include <sstream>
 #include <fuse.h>
 #include <time.h>
-#include "utils.h"
 #include "Git.h"
-#include "OpenContext.h"
+#include "utils.h"
 #include "Timer.h"
+#include "OpenContext.h"
 #include "3rd-party/json.hpp"
 
 using Json = nlohmann::json;
@@ -165,7 +165,7 @@ static int sfs_open(const char *path, struct fuse_file_info *fi)
         }
         bool executable;
         git->dump(path_mangle(path), tmp, &executable);
-        printf("dumped %s\n", tmp);
+        LOG << "dumped " << tmp << std::endl;
         OpenContext *ctx = new OpenContext(path_mangle(path), tmp);
         fi->fh = (uint64_t)(void *)ctx;
         ctx->fd = open(tmp, O_RDWR);
@@ -362,7 +362,7 @@ static int sfs_rename(const char *oldname, const char *newname)
                     [] (const std::string &oldname, const std::string &newname)
                     {
                         OpenContext::for_each(oldname, [&] (OpenContext *ctx) { ctx->rename(newname); });
-                        printf("rename %s to %s\n", oldname.c_str(), newname.c_str());
+                        LOG << "rename " << oldname.c_str() << " to " << newname.c_str() << std::endl;
                     });
         return 0;
     }
@@ -414,6 +414,8 @@ int main(int argc, char **argv)
         configFile >> config;
     } // Here the file closes
 
+    if (config.count("log_file") && !config["log_file"].empty())
+        logPtr = new std::ofstream(config["log_file"].get<std::string>()); // Not deleting this object
     commit_on_write = config["commit_on_write"].get<bool>();
     read_only = config["read_only"].get<bool>();
     commit_interval = config["commit_interval"].get<int>();

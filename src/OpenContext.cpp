@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <unistd.h>
 #include "Git.h"
+#include "utils.h"
 #include "OpenContext.h"
 
 std::unordered_map<std::string, std::vector<OpenContext *> > OpenContext::openContexts;
@@ -19,12 +20,12 @@ OpenContext::~OpenContext()
     removeMap();
     if (fd >= 0)
     {
-        printf("close %d\n", fd);
+        LOG << "close fd" << std::endl;
         close(fd);
     }
     if (tmpfile != "")
     {
-        printf("unlink %s\n", tmpfile.c_str());
+        LOG << "unlink " << tmpfile.c_str() << std::endl;
         unlink(tmpfile.c_str());
     }
 }
@@ -62,7 +63,7 @@ void OpenContext::commit(Git &git, const char *msg)
     }
     else
     {
-        printf("not dirty\n");
+        LOG << "not dirty" << std::endl;
     }
 }
 

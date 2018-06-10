@@ -17,7 +17,7 @@ int Git::checkErrorImpl(int error, const char *fn)
         std::string msg =
             std::string(fn) + ": Error " + std::to_string(error) + "/" + std::to_string(e->klass) +
             ": " + e->message;
-        printf("Git Error: %s\n", msg.c_str());
+        LOG << "Git Error: " << msg.c_str() << std::endl;
         throw Error(error, msg);
     }
     return error;
@@ -85,7 +85,7 @@ void Git::checkout_branch(time_t timeoff)
     time_t mintime=0x7fffffff;
     const git_oid* mintime_commit_id = nullptr;
     git_reference* head = nullptr;
-        
+
     CHECK_ERROR(git_branch_iterator_new(&branch_iterator, repo, GIT_BRANCH_LOCAL));
     CHECK_ERROR(git_repository_head(&head, repo));
     const git_oid* head_commit_id= git_reference_target(head);
@@ -99,8 +99,8 @@ void Git::checkout_branch(time_t timeoff)
         do{
 		    CHECK_ERROR(git_commit_lookup(&last_commit, repo, commit_id));
             unsigned int parentcount=git_commit_parentcount(last_commit);
-		    if (parentcount ==0) break;
-		    assert(parentcount==1);		
+		    if (parentcount == 0) break;
+		    assert(parentcount== 1);
 		    time_t commit_time=git_commit_time(last_commit);
 		    if (commit_time<=timeoff && (timeoff-commit_time<mintime || (timeoff-commit_time==mintime && !git_oid_cmp(head_commit_id,commit_id))))
 		    {
@@ -116,14 +116,14 @@ void Git::checkout_branch(time_t timeoff)
     git_branch_iterator_free(branch_iterator);
     if (mintime_commit_id == NULL) return;
     if (!git_oid_cmp(head_commit_id,mintime_commit_id)) return;
-    CHECK_ERROR(git_commit_lookup(&last_commit, repo, mintime_commit_id));  
+    CHECK_ERROR(git_commit_lookup(&last_commit, repo, mintime_commit_id));
     CHECK_ERROR(git_branch_create(&new_branch, repo, (branch_name_prefix+std::to_string(branch_num)).c_str(), last_commit, 0));
     git_tree *tree=nullptr;
     git_index* index = nullptr;
     git_commit_tree(&tree, last_commit);
     CHECK_ERROR(git_repository_index(&index, repo));
     CHECK_ERROR(git_index_read_tree(index, tree));
-    CHECK_ERROR(git_index_write(index));    
+    CHECK_ERROR(git_index_write(index));
     CHECK_ERROR(git_repository_set_head(repo, git_reference_name(new_branch)));
     git_index_free(index);
     git_tree_free(tree);
@@ -217,7 +217,7 @@ void Git::commit(const git_oid &blob_id, const std::string &path, const char *ms
     char idstr[256];
     memset(idstr, 0, sizeof(idstr));
     git_oid_fmt(idstr, &blob_id);
-    printf("blob id %s\n", idstr);
+    LOG << "blob id " << idstr << std::endl;
 
     git_index_entry e;
     memset(&e, 0, sizeof(e));
@@ -251,7 +251,7 @@ void Git::commit(const IndexPtr &index, const CommitPtr &head, const char *msg)
 
     memset(idstr, 0, sizeof(idstr));
     git_oid_fmt(idstr, &tree_id);
-    printf("tree id %s\n", idstr);
+    LOG << "tree id " << idstr << std::endl;
 
     git_tree *tree_;
     CHECK_ERROR(git_tree_lookup(&tree_, repo, &tree_id));
@@ -264,7 +264,7 @@ void Git::commit(const IndexPtr &index, const CommitPtr &head, const char *msg)
 
     memset(idstr, 0, sizeof(idstr));
     git_oid_fmt(idstr, &commit_id);
-    printf("commit id %s\n", idstr);
+    LOG << "commit id " << idstr << std::endl;
 }
 
 void Git::commit_remove(const std::string &path, const char *msg)
@@ -379,7 +379,7 @@ int Git::treeWalkCallback(const char *root, const git_tree_entry *entry, void *_
 
 std::vector<Git::FileAttr> Git::listDir(const std::string &path) const
 {
-    
+
     TreePtr root = this->root(), tree = nullptr;
 
     assert(path.length() > 0 && path[0] == '/');
