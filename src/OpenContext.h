@@ -31,9 +31,8 @@ public:
     void chmod(bool executable);
     void rename(const std::string &newname);
 
-    static std::vector<OpenContext *> find(const std::string &path);
     static void for_each(const std::string &path, const std::function<void (OpenContext *)> &f);
-    static std::unordered_map<std::string, std::vector<OpenContext *> > &contexts(); // TODO(twd2): const?
+    static const std::unordered_map<std::string, std::vector<OpenContext *> > &contexts();
 
 private:
     void removeMap();

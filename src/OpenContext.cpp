@@ -81,29 +81,15 @@ void OpenContext::rename(const std::string &newname)
     // dirty = true; // TODO ?
 }
 
-std::vector<OpenContext *> OpenContext::find(const std::string &path)
-{
-    auto iter = openContexts.find(path);
-    if (iter == openContexts.end())
-    {
-        return std::vector<OpenContext *>();
-    }
-    else
-    {
-        return iter->second;
-    }
-}
-
 void OpenContext::for_each(const std::string &path, const std::function<void (OpenContext *)> &f)
 {
-    std::vector<OpenContext *> v = find(path);
-    for (OpenContext *ctx : v)
-    {
-        f(ctx);
-    }
+    auto iter = openContexts.find(path);
+    if (iter != openContexts.end())
+        for (OpenContext *ctx : iter->second)
+            f(ctx);
 }
 
-std::unordered_map<std::string, std::vector<OpenContext *> > &OpenContext::contexts()
+const std::unordered_map<std::string, std::vector<OpenContext *> > &OpenContext::contexts()
 {
     return openContexts;
 }
