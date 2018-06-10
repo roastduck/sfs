@@ -372,9 +372,18 @@ static int sfs_rename(const char *oldname, const char *newname)
     }
 }
 
+static int sfs_utimens(const char *name, const struct timespec tv[2])
+{
+    // Implement this, otherwise command `touch` will panic
+    UNUSED(name);
+    UNUSED(tv);
+    return 0;
+}
+
 static struct fuse_operations sfs_ops;
 // CAUTIOUS: If you put `sfs_ops` in the stack, all the things will go wrong!
 
+#ifndef NDEBUG
 void test_mangle()
 {
     // embedded tests
@@ -398,10 +407,13 @@ void test_mangle()
     assert(path_demangle("$///") == "");
     assert(path_demangle("$123///") == "123///");
 }
+#endif
 
 int main(int argc, char **argv)
 {
+#ifndef NDEBUG
     test_mangle();
+#endif
 
     if (argc != 2)
     {
@@ -450,6 +462,7 @@ int main(int argc, char **argv)
     sfs_ops.releasedir = sfs_releasedir;
     sfs_ops.chmod = sfs_chmod;
     sfs_ops.rename = sfs_rename;
+    sfs_ops.utimens = sfs_utimens;
     return fuse_main(fuseArgc, fuseArgv, &sfs_ops, NULL);
 }
 
