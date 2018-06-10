@@ -4,13 +4,13 @@
 #include <unistd.h>
 #include <fstream>
 #include <iostream>
-#include <sstream>
 #include <fuse.h>
 #include <time.h>
 #include "utils.h"
 #include "Git.h"
 #include "OpenContext.h"
 #include "Timer.h"
+#include "mangle.h"
 #include "3rd-party/json.hpp"
 
 using Json = nlohmann::json;
@@ -22,83 +22,10 @@ int commit_interval = -1;
 const char *time_format_str="%d-%d-%d %d:%d:%d";
 
 static constexpr const char *GITKEEP_MAGIC = ".gitkeep";
-const std::string path_mangle_prefix = "$";
-const std::size_t path_mangle_len = path_mangle_prefix.length();
-
-// TODO(twd2): performance improvement
-
-std::string path_mangle(const std::string &path)
-{
-    std::stringstream newpath;
-    std::size_t len = path.length();
-    std::stringstream part_stream;
-    for (std::size_t i = 0; i <= len; i++)
-    {
-        if (i == len || path[i] == '/')
-        {
-            std::string part = part_stream.str();
-            part_stream.str("");
-            if (part == "" || part == "." || part == "..")
-            {
-                newpath << part;
-            }
-            else
-            {
-                newpath << path_mangle_prefix << part;
-            }
-            if (i < len)
-            {
-                newpath.put('/');
-            }
-        }
-        else
-        {
-            part_stream.put(path[i]);
-        }
-    }
-    return newpath.str();
-}
-
-std::string path_demangle(const std::string &path)
-{
-    std::stringstream newpath;
-    std::size_t len = path.length();
-    std::stringstream part_stream;
-    for (std::size_t i = 0; i <= len; i++)
-    {
-        if (i == len || path[i] == '/')
-        {
-            std::string part = part_stream.str();
-            std::size_t part_len = part.length();
-            part_stream.str("");
-            if (part == "" || part == "." || part == "..")
-            {
-                newpath << part;
-            }
-            else if (part_len <= path_mangle_len ||
-                     part.substr(0, path_mangle_len) != path_mangle_prefix)
-            {
-                return "";
-            }
-            else
-            {
-                newpath << part.substr(path_mangle_len);
-            }
-            if (i < len)
-            {
-                newpath.put('/');
-            }
-        }
-        else
-        {
-            part_stream.put(path[i]);
-        }
-    }
-    return newpath.str();
-}
 
 time_t string2time(const std::string &str)
 {
+    // FIXME(twd2): use strptime
     struct tm tm1;
     int year,mon,mday,hour,min,sec;
     if( -1 == sscanf(str.c_str(),time_format_str,&year,&mon,&mday,&hour,&min,&sec)) return -1;
@@ -374,30 +301,6 @@ static int sfs_rename(const char *oldname, const char *newname)
 
 static struct fuse_operations sfs_ops;
 // CAUTIOUS: If you put `sfs_ops` in the stack, all the things will go wrong!
-
-void test_mangle()
-{
-    // embedded tests
-    assert(path_mangle("/path/to/.git") == "/$path/$to/$.git");
-    assert(path_mangle("/") == "/");
-    assert(path_mangle("///123") == "///$123");
-    assert(path_mangle("file") == "$file");
-    assert(path_mangle("/./a") == "/./$a");
-    assert(path_mangle("/../a") == "/../$a");
-    assert(path_mangle("/.../a") == "/$.../$a");
-    assert(path_demangle("/$path/$to/$.git") == "/path/to/.git");
-    assert(path_demangle("/") == "/");
-    assert(path_demangle("///$123") == "///123");
-    assert(path_demangle("$file") == "file");
-    assert(path_demangle("/./$a") == "/./a");
-    assert(path_demangle("/../$a") == "/../a");
-    assert(path_demangle("/$.../$a") == "/.../a");
-    assert(path_demangle("/$path/file") == "");
-    assert(path_demangle("") == "");
-    assert(path_demangle("/path/file") == "");
-    assert(path_demangle("$///") == "");
-    assert(path_demangle("$123///") == "123///");
-}
 
 int main(int argc, char **argv)
 {
