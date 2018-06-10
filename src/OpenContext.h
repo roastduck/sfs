@@ -1,10 +1,11 @@
 #ifndef OPEN_CONTEXT_H_
 #define OPEN_CONTEXT_H_
 
-#include <string>
+#include <mutex>
 #include <vector>
-#include <unordered_map>
+#include <string>
 #include <functional>
+#include <unordered_map>
 
 class Git;
 
@@ -21,6 +22,7 @@ public:
     bool dirty = false;
     bool executable = false;
     bool commit_on_next_write = false;
+    static std::mutex openContextsLock;
 
     explicit OpenContext(const std::string &path, const std::string &tmpfile);
 
@@ -35,6 +37,7 @@ public:
     static const std::unordered_map<std::string, std::vector<OpenContext *> > &contexts();
 
 private:
+    void emplaceMap();
     void removeMap();
 };
 

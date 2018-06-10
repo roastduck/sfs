@@ -6,11 +6,12 @@
 #include "OpenContext.h"
 
 std::unordered_map<std::string, std::vector<OpenContext *> > OpenContext::openContexts;
+std::mutex OpenContext::openContextsLock;
 
 OpenContext::OpenContext(const std::string &path, const std::string &tmpfile)
     : path(path), tmpfile(tmpfile)
 {
-    openContexts[path].push_back(this);
+    emplaceMap();
 }
 
 OpenContext::~OpenContext()
@@ -28,8 +29,16 @@ OpenContext::~OpenContext()
     }
 }
 
+void OpenContext::emplaceMap()
+{
+    openContextsLock.lock();
+    openContexts[path].push_back(this);
+    openContextsLock.unlock();
+}
+
 void OpenContext::removeMap()
 {
+    openContextsLock.lock();
     auto &v = openContexts[path];
     auto iter = std::find(v.begin(), v.end(), this);
     assert(iter != v.end());
@@ -38,6 +47,7 @@ void OpenContext::removeMap()
     {
         openContexts.erase(path);
     }
+    openContextsLock.unlock();
 }
 
 void OpenContext::commit(Git &git, const char *msg)
@@ -75,9 +85,9 @@ void OpenContext::rename(const std::string &newname)
 {
     if (path == newname) return;
 
-    openContexts[newname].push_back(this);
     removeMap();
     path = newname;
+    emplaceMap();
     // dirty = true; // TODO ?
 }
 

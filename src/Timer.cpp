@@ -13,15 +13,16 @@ void Timer::timer_loop(int interval)
     while (true)
     {
         printf("Timed out, setting commit flags...\n");
+        OpenContext::openContextsLock.lock();
         for (auto &p : OpenContext::contexts())
         {
             for (OpenContext *ctx : p.second)
             {
                 ctx->commit_on_next_write = true;
-                // TODO(twd2): fence?
                 printf("Find a context.\n");
             }
         }
+        OpenContext::openContextsLock.unlock();
 
         sleep(interval);
     }
