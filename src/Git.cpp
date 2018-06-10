@@ -118,8 +118,17 @@ void Git::checkout_branch(time_t timeoff)
     if (!git_oid_cmp(head_commit_id,mintime_commit_id)) return;
     CHECK_ERROR(git_commit_lookup(&last_commit, repo, mintime_commit_id));  
     CHECK_ERROR(git_branch_create(&new_branch, repo, (branch_name_prefix+std::to_string(branch_num)).c_str(), last_commit, 0));
+    git_tree *tree=nullptr;
+    git_index* index = nullptr;
+    git_commit_tree(&tree, last_commit);
+    CHECK_ERROR(git_repository_index(&index, repo));
+    CHECK_ERROR(git_index_read_tree(index, tree));
+    CHECK_ERROR(git_index_write(index));    
+    CHECK_ERROR(git_repository_set_head(repo, git_reference_name(new_branch)));
+    git_index_free(index);
+    git_tree_free(tree);
     git_commit_free(last_commit);
-    git_repository_set_head(repo, git_reference_name(new_branch));
+    git_reference_free(new_branch);
 }
 Git::CommitPtr Git::head(const char *spec) const
 {
