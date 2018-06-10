@@ -6,11 +6,12 @@
 #include "OpenContext.h"
 
 std::unordered_map<std::string, std::vector<OpenContext *> > OpenContext::openContexts;
+std::mutex OpenContext::openContextsLock;
 
 OpenContext::OpenContext(const std::string &path, const std::string &tmpfile)
     : path(path), tmpfile(tmpfile)
 {
-    openContexts[path].push_back(this);
+    emplaceMap();
 }
 
 OpenContext::~OpenContext()
@@ -28,8 +29,16 @@ OpenContext::~OpenContext()
     }
 }
 
+void OpenContext::emplaceMap()
+{
+    openContextsLock.lock();
+    openContexts[path].push_back(this);
+    openContextsLock.unlock();
+}
+
 void OpenContext::removeMap()
 {
+    openContextsLock.lock();
     auto &v = openContexts[path];
     auto iter = std::find(v.begin(), v.end(), this);
     assert(iter != v.end());
@@ -38,6 +47,7 @@ void OpenContext::removeMap()
     {
         openContexts.erase(path);
     }
+    openContextsLock.unlock();
 }
 
 void OpenContext::commit(Git &git, const char *msg)
@@ -75,31 +85,22 @@ void OpenContext::rename(const std::string &newname)
 {
     if (path == newname) return;
 
-    openContexts[newname].push_back(this);
     removeMap();
     path = newname;
+    emplaceMap();
     // dirty = true; // TODO ?
-}
-
-std::vector<OpenContext *> OpenContext::find(const std::string &path)
-{
-    auto iter = openContexts.find(path);
-    if (iter == openContexts.end())
-    {
-        return std::vector<OpenContext *>();
-    }
-    else
-    {
-        return iter->second;
-    }
 }
 
 void OpenContext::for_each(const std::string &path, const std::function<void (OpenContext *)> &f)
 {
-    std::vector<OpenContext *> v = find(path);
-    for (OpenContext *ctx : v)
-    {
-        f(ctx);
-    }
+    auto iter = openContexts.find(path);
+    if (iter != openContexts.end())
+        for (OpenContext *ctx : iter->second)
+            f(ctx);
+}
+
+const std::unordered_map<std::string, std::vector<OpenContext *> > &OpenContext::contexts()
+{
+    return openContexts;
 }
 

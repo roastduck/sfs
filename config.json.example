@@ -4,5 +4,6 @@
     "fuse_args": ["-d", "/path/to/your/mounting/point"],
     "commit_on_write": false,
     "version_selection":false,
-    "version_time":"2100-07-04 00:00:00"
+    "version_time":"2100-07-04 00:00:00",
+    "commit_interval": 0
 }

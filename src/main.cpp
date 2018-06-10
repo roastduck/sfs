@@ -10,6 +10,7 @@
 #include "utils.h"
 #include "Git.h"
 #include "OpenContext.h"
+#include "Timer.h"
 #include "3rd-party/json.hpp"
 
 using Json = nlohmann::json;
@@ -17,9 +18,7 @@ using Json = nlohmann::json;
 Json config;
 Git *git;
 bool commit_on_write = false, read_only = false;
-#define CHECK_READONLY() \
-    do { if (read_only) return -EROFS; } while (0)
-
+int commit_interval = -1;
 const char *time_format_str="%d-%d-%d %d:%d:%d";
 
 static constexpr const char *GITKEEP_MAGIC = ".gitkeep";
@@ -98,19 +97,22 @@ std::string path_demangle(const std::string &path)
     return newpath.str();
 }
 
-time_t string2time(const std::string &str)  
-{  
-  struct tm tm1;  
-  int year,mon,mday,hour,min,sec;  
-  if( -1 == sscanf(str.c_str(),time_format_str,&year,&mon,&mday,&hour,&min,&sec)) return -1;  
-  tm1.tm_year=year-1900;  
-  tm1.tm_mon=mon-1;  
-  tm1.tm_mday=mday;  
-  tm1.tm_hour=hour;  
-  tm1.tm_min=min;  
-  tm1.tm_sec=sec;  
-  return mktime(&tm1);  
-} 
+time_t string2time(const std::string &str)
+{
+    struct tm tm1;
+    int year,mon,mday,hour,min,sec;
+    if( -1 == sscanf(str.c_str(),time_format_str,&year,&mon,&mday,&hour,&min,&sec)) return -1;
+    tm1.tm_year=year-1900;
+    tm1.tm_mon=mon-1;
+    tm1.tm_mday=mday;
+    tm1.tm_hour=hour;
+    tm1.tm_min=min;
+    tm1.tm_sec=sec;
+    return mktime(&tm1);
+}
+
+#define CHECK_READONLY() \
+    do { if (read_only) return -EROFS; } while (0)
 
 static int sfs_readdir(
     const char *path, void *buf, fuse_fill_dir_t filler,
@@ -213,7 +215,11 @@ static int sfs_write(const char *path, const char *buf, size_t size, off_t offse
     if ((ret = lseek(ctx->fd, offset, SEEK_SET)) < 0) return ret;
     if ((ret = write(ctx->fd, buf, size)) < 0) return ret;
     ctx->dirty = true;
-    if (commit_on_write) ctx->commit(*git, "write");
+    if (commit_on_write || ctx->commit_on_next_write)
+    {
+        ctx->commit(*git, "write");
+        ctx->commit_on_next_write = false;
+    }
     return ret;
 }
 
@@ -410,6 +416,7 @@ int main(int argc, char **argv)
 
     commit_on_write = config["commit_on_write"].get<bool>();
     read_only = config["read_only"].get<bool>();
+    commit_interval = config["commit_interval"].get<int>();
     bool version_selection=config["version_selection"].get<bool>();
     git = new Git(config["git_path"].get<std::string>()); // Will not be deleted
     git->checkSig();
@@ -421,6 +428,8 @@ int main(int argc, char **argv)
     char *fuseArgv[fuseArgc];
     for (int i = 0; i < fuseArgc; i++)
         fuseArgv[i] = const_cast<char*>(fuseArgs[i].c_str()); // I bet FUSE won't change it
+
+    Timer::start(commit_interval);
 
     // Named struct initializaion is only supported in plain C
     // So we are using assignments here
