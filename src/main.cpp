@@ -217,7 +217,7 @@ static int sfs_write(const char *path, const char *buf, size_t size, off_t offse
     ctx->dirty = true;
     if (commit_on_write || ctx->commit_on_next_write)
     {
-        ctx->commit(*git, "write");
+        ctx->commit(*git, ctx->commit_on_next_write ? "timed commit" : "write");
         ctx->commit_on_next_write = false;
     }
     return ret;
