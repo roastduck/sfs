@@ -48,6 +48,8 @@ static int sfs_readdir(
 {
     UNUSED(offset);
     UNUSED(fi);
+    filler(buf, ".", nullptr, 0);
+    filler(buf, "..", nullptr, 0);
     try
     {
         auto list = git->listDir(path_mangle(path));
